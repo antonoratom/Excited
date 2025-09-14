@@ -1,0 +1,65 @@
+.nav-links_wrap {
+  display: flex;
+}
+
+.nav-links_wrap:has(a:is(:focus-visible, :hover)) {
+  --intent: 1;
+}
+
+.nav-links_wrap::before,
+.nav-links_wrap::after {
+  --transition: 0.22s;
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  opacity: var(--intent, 0);
+  z-index: -1;
+  border-radius: 6px;
+  background: grey;
+  transition: top var(--transition), left var(--transition),
+    height var(--transition), opacity var(--transition), color var(--transition),
+    width var(--transition);
+  transition-timing-function: linear(
+    0 0%,
+    0.2342 12.49%,
+    0.4374 24.99%,
+    0.6093 37.49%,
+    0.6835 43.74%,
+    0.7499 49.99%,
+    0.8086 56.25%,
+    0.8593 62.5%,
+    0.9023 68.75%,
+    0.9375 75%,
+    0.9648 81.25%,
+    0.9844 87.5%,
+    0.9961 93.75%,
+    1 100%
+  );
+}
+
+.nav-links_wrap::after {
+  top: calc(var(--target-y) * 1px);
+  left: calc((var(--target-x) * 1px) + 1.25rem);
+  height: calc(var(--target-height) * 1px);
+  width: calc((var(--target-width) * 1px) - 2.5rem);
+  opacity: 1;
+  background: transparent;
+  border-radius: 0;
+  border-bottom: 2px solid currentColor;
+  view-transition-name: target;
+}
+
+/* Targeting */
+@supports (anchor-name: --a) {
+  .btn[custom-attribute="nav-links"]:has(a:is(:hover, :focus-visible)) {
+    anchor-name: --anchor;
+  }
+
+  .nav-links_wrap::before {
+    position-anchor: --anchor;
+    left: anchor(left);
+    top: anchor(top);
+    width: anchor-size(width);
+    height: anchor-size(height);
+  }
+}

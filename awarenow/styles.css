@@ -1,0 +1,33 @@
+@media (min-width: 991px) and (max-width: 1439px) {
+  :root {
+    --_spacing---spacing-utility-rem--0-125rem: clamp(0.1rem, 0.0448rem + 0.0891vw, 0.125rem);
+    --_spacing---spacing-utility-rem--0-25rem: clamp( 0.175rem, 0.0095rem + 0.2673vw, 0.25rem);
+    --_spacing---spacing-utility-rem--0-5rem: clamp( 0.4rem, 0.1793rem + 0.3563vw, 0.5rem);
+    --_spacing---spacing-utility-rem--0-75rem: clamp( 0.6rem, 0.2689rem + 0.5345vw, 0.75rem);
+    --_spacing---spacing-utility-rem--0-875rem: clamp( 0.7rem, 0.3138rem + 0.6236vw, 0.875rem);
+    --_spacing---spacing-utility-rem--1rem: clamp( 0.85rem, 0.5189rem + 0.5345vw, 1rem);
+    --_spacing---spacing-utility-rem--1-125rem: clamp( 0.9rem, 0.4034rem + 0.8018vw, 1.125rem);
+    --_spacing---spacing-utility-rem--1-25rem: clamp( 1rem, 0.4482rem + 0.8909vw, 1.25rem);
+    --_spacing---spacing-utility-rem--1-5rem: clamp( 1.2rem, 0.5379rem + 1.069vw, 1.5rem);
+    --_spacing---spacing-utility-rem--1-75rem: clamp( 1.4rem, 0.6275rem + 1.2472vw, 1.75rem);
+    --_spacing---spacing-utility-rem--2rem: clamp( 1.65rem, 0.8775rem + 1.2472vw, 2rem);
+    --_spacing---spacing-utility-rem--2-5rem: clamp( 1.9rem, 0.5757rem + 2.1381vw, 2.5rem);
+    --_spacing---spacing-utility-rem--3rem: clamp( 2.4rem, 1.0757rem + 2.1381vw, 3rem);
+    --_spacing---spacing-utility-rem--3-5rem: clamp( 2.8rem, 1.255rem + 2.4944vw, 3.5rem);
+    --_spacing---spacing-utility-rem--4rem: clamp( 3rem, 0.7929rem + 3.5635vw, 4rem);
+    --_spacing---spacing-utility-rem--5rem: clamp( 3.5rem, 0.1893rem + 5.3452vw, 5rem);
+    --_spacing---spacing-utility-rem--5-5rem: clamp( 3.78rem, -0.0163rem + 6.1292vw, 5.5rem);
+    --_spacing---spacing-utility-rem--6rem: clamp( 4.2rem, 0.2272rem + 6.4143vw, 6rem);
+    --_spacing---spacing-utility-rem--6-5rem: clamp(4.5rem, 0.0857rem + 7.1269vw, 6.5rem);
+    --_spacing---spacing-utility-rem--7rem: clamp( 4.8rem, -0.0557rem + 7.8396vw, 7rem);
+    --_spacing---spacing-utility-rem--7-5rem: clamp( 5.2rem, 0.1236rem + 8.196vw, 7.5rem);
+    --_spacing---spacing-utility-rem--8rem: clamp( 5.5rem, -0.0178rem + 8.9087vw, 8rem);  
+    --_spacing---spacing-utility-rem--9rem: clamp( 6.2rem, 0.02rem + 9.9777vw, 9rem);
+    --_spacing---spacing-utility-rem--10rem: clamp( 6.9rem, 0.0579rem + 11.0468vw, 10rem);
+    --_spacing---spacing-layout--container-max-width-90: clamp(55rem, 2.029rem + 85.5234vw, 79rem);
+
+    --_fonts---type-h1--font-size: clamp(2.15rem, -0.0019rem + 3.4744vw, 3.125rem);
+    --_fonts---type-h2--font-size: clamp(1.9rem, 0.0239rem + 3.029vw, 2.75rem);
+    --_fonts---type-h3--font-size: clamp(1.7rem, 0.2102rem + 2.4053vw, 2.375rem);
+  }
+}

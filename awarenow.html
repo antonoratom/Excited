@@ -1,0 +1,107 @@
+<nav data-magnetic>
+  <ul>
+    <li>
+      <a style="view-transition-name: one" href="#home" id="home">Home</a>
+    </li>
+    <li>
+      <a style="view-transition-name: two" href="#craft" id="craft">Craft</a>
+    </li>
+    <li>
+      <a style="view-transition-name: three" href="#posts" id="posts">Posts</a>
+    </li>
+    <li>
+      <a style="view-transition-name: four" href="#snippets" id="snippets"
+        >longer text here</a
+      >
+    </li>
+  </ul>
+  <style type="text/css"></style>
+</nav>
+
+<style>
+  *,
+  *:after,
+  *:before {
+    box-sizing: border-box;
+  }
+
+  ul {
+    display: flex;
+  }
+
+  li {
+    display: grid;
+    place-items: center;
+    font-weight: 400;
+  }
+
+  li a {
+    padding: 0.5rem 1.25rem;
+    text-decoration: none;
+  }
+
+
+  ul:has(a:is(:focus-visible, :hover)) {
+    --intent: 1;
+  }
+
+  ul::before,
+  ul::after {
+    --transition: 0.22s;
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    opacity: var(--intent, 0);
+    z-index: -1;
+    border-radius: 6px;
+    background: grey;
+    transition: top var(--transition), left var(--transition),
+      height var(--transition), opacity var(--transition),
+      color var(--transition), width var(--transition);
+    transition-timing-function: linear(
+      0 0%,
+      0.2342 12.49%,
+      0.4374 24.99%,
+      0.6093 37.49%,
+      0.6835 43.74%,
+      0.7499 49.99%,
+      0.8086 56.25%,
+      0.8593 62.5%,
+      0.9023 68.75%,
+      0.9375 75%,
+      0.9648 81.25%,
+      0.9844 87.5%,
+      0.9961 93.75%,
+      1 100%
+    );
+  }
+
+  ul::after {
+    top: calc(var(--target-y) * 1px);
+    left: calc((var(--target-x) * 1px) + 1.25rem);
+    height: calc(var(--target-height) * 1px);
+    width: calc((var(--target-width) * 1px) - 2.5rem);
+    opacity: 1;
+    background: transparent;
+    border-radius: 0;
+    border-bottom: 2px solid currentColor;
+    view-transition-name: target;
+  }
+
+  /* Targeting */
+  @supports (anchor-name: --a) {
+    li:has(a:is(:hover, :focus-visible)) {
+      anchor-name: --anchor;
+    }
+
+    ul::before {
+      position-anchor: --anchor;
+      left: anchor(left);
+      top: anchor(top);
+      width: anchor-size(width);
+      height: anchor-size(height);
+    }
+
+  }
+/* MY CODE */
+</style>
