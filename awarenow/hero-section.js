@@ -1,4 +1,18 @@
 document.addEventListener("DOMContentLoaded", function () {
+  // Check if this is the first user session
+  const hasSeenHeroAnimation = localStorage.getItem('hasSeenHeroAnimation');
+  
+  if (hasSeenHeroAnimation) {
+    // User has already seen the animation, enable scroll and exit
+    if (typeof lenis !== 'undefined') {
+      lenis.start();
+    }
+    return;
+  }
+
+  // Mark that user has now seen the animation
+  localStorage.setItem('hasSeenHeroAnimation', 'true');
+
   // Check screen size - don't run if smaller than 991px
   if (window.innerWidth < 991) {
     return;
