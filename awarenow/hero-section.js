@@ -1,17 +1,17 @@
 document.addEventListener("DOMContentLoaded", function () {
   // Check if this is the first user session
-  const hasSeenHeroAnimation = localStorage.getItem('hasSeenHeroAnimation');
-  
+  const hasSeenHeroAnimation = localStorage.getItem("hasSeenHeroAnimation");
+
   if (hasSeenHeroAnimation) {
     // User has already seen the animation, enable scroll and exit
-    if (typeof lenis !== 'undefined') {
+    if (typeof lenis !== "undefined") {
       lenis.start();
     }
     return;
   }
 
   // Mark that user has now seen the animation
-  localStorage.setItem('hasSeenHeroAnimation', 'true');
+  localStorage.setItem("hasSeenHeroAnimation", "true");
 
   // Check screen size - don't run if smaller than 991px
   if (window.innerWidth < 991) {
@@ -19,14 +19,14 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // Disable scroll at the beginning (assuming lenis is available globally)
-  if (typeof lenis !== 'undefined') {
+  if (typeof lenis !== "undefined") {
     lenis.stop();
   }
 
   document
     .querySelectorAll('a[custom-attribute="hero-stag"]')
     .forEach((link) => link.setAttribute("hero-stag", ""));
-  
+
   const heroWrapEl = document.querySelector(".home-hero-tag_bl");
   const aiTagEl = document.querySelector(".ai-tag");
   const heroImgWrapEl = document.querySelector(".home-hero-img_wrap");
@@ -57,6 +57,8 @@ document.addEventListener("DOMContentLoaded", function () {
   gsap.set(heroTextStrokeEls, {
     color: "#ffffff",
     webkitTextStrokeWidth: "1",
+    width: "auto",
+    opacity: 0,
   });
 
   gsap.set(heroImgWrapEl, {
@@ -76,15 +78,21 @@ document.addEventListener("DOMContentLoaded", function () {
   // Create timeline with onComplete to enable scroll
   const tl = gsap.timeline({
     delay: 0.4,
-    onComplete: function() {
+    onComplete: function () {
       // Re-enable scroll after animation completes
-      if (typeof lenis !== 'undefined') {
+      if (typeof lenis !== "undefined") {
         lenis.start();
       }
-    }
+    },
   });
 
   // Text stroke animation: before first animation
+  heroTextStrokeEls.forEach((element) => {
+    tl.to(element, {
+      opacity: 1,
+      duration: 0,
+    });
+  });
   heroTextStrokeEls.forEach((element) => {
     tl.to(
       element,
@@ -97,7 +105,6 @@ document.addEventListener("DOMContentLoaded", function () {
       1
     );
   });
-
   // Hero illustrations width animation: at the same time as text stroke
   tl.to(
     heroIllustrationsWrapEl,
