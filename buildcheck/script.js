@@ -1,312 +1,542 @@
-        // Wait for the DOM to be fully loaded
-        document.addEventListener('DOMContentLoaded', function() {
+// Wait for the DOM to be fully loaded
+document.addEventListener("DOMContentLoaded", function () {
+  // Set initial states for all bg-stage elements
+  gsap.set(
+    "[bg-stage='one'], [bg-stage='two'], [bg-stage='three'], [bg-stage='four'], [bg-stage='five']",
+    {
+      scale: 0.8,
+      opacity: 0,
+    }
+  );
 
-        // Set initial states for all bg-stage elements
-        gsap.set("[bg-stage='one'], [bg-stage='two'], [bg-stage='three'], [bg-stage='four'], [bg-stage='five']", {
-        scale: 0.8,
-        opacity: 0
-        });
+  // Set initial states for hero images
+  gsap.set(".hero-image-fg", {
+    scale: 0.9,
+    opacity: 0,
+  });
 
-        // Set initial states for hero images
-        gsap.set(".hero-image-fg", {
-        scale: 0.9,
-        opacity: 0
-        });
+  gsap.set(".hero-h_wrap", {
+    x: 24,
+    opacity: 0,
+  });
 
-        gsap.set(".hero-h_wrap", {
-        x: 24,
-        opacity: 0
-        });
+  // Create timeline for sequenced animations
+  const tl = gsap.timeline();
 
-        // Create timeline for sequenced animations
-        const tl = gsap.timeline();
-
-        // Animate each stage with progressive delays
-        tl.to("[bg-stage='one']", {
-        scale: 1,
-        opacity: 1,
-        duration: 0.9,
-        ease: "power2.out"
-        })
-        .to("[bg-stage='two']", {
-        scale: 1,
-        opacity: 1,
-        duration: 0.9,
-        ease: "power2.out"
-        }, 0.2)
-        .to("[bg-stage='three']", {
-        scale: 1,
-        opacity: 1,
-        duration: 0.9,
-        ease: "power2.out"
-        }, 0.4)
-        .to("[bg-stage='four']", {
-        scale: 1,
-        opacity: 1,
-        duration: 0.9,
-        ease: "power2.out"
-        }, 0.6)
-        .to("[bg-stage='five']", {
-        scale: 1,
-        opacity: 1,
-        duration: 0.9,
-        ease: "power2.out"
-        }, 0.8)
-
-        .to(".hero-image-fg", {
+  // Animate each stage with progressive delays
+  tl.to("[bg-stage='one']", {
+    scale: 1,
+    opacity: 1,
+    duration: 0.9,
+    ease: "power2.out",
+  })
+    .to(
+      "[bg-stage='two']",
+      {
         scale: 1,
         opacity: 1,
         duration: 0.9,
         ease: "power2.out",
-        stagger: 0.3
-        }, .6)
+      },
+      0.2
+    )
+    .to(
+      "[bg-stage='three']",
+      {
+        scale: 1,
+        opacity: 1,
+        duration: 0.9,
+        ease: "power2.out",
+      },
+      0.4
+    )
+    .to(
+      "[bg-stage='four']",
+      {
+        scale: 1,
+        opacity: 1,
+        duration: 0.9,
+        ease: "power2.out",
+      },
+      0.6
+    )
+    .to(
+      "[bg-stage='five']",
+      {
+        scale: 1,
+        opacity: 1,
+        duration: 0.9,
+        ease: "power2.out",
+      },
+      0.8
+    )
 
-        .to(".hero-h_wrap", {
+    .to(
+      ".hero-image-fg",
+      {
+        scale: 1,
+        opacity: 1,
+        duration: 0.9,
+        ease: "power2.out",
+        stagger: 0.3,
+      },
+      0.6
+    )
+
+    .to(
+      ".hero-h_wrap",
+      {
         x: 0,
         opacity: 1,
         duration: 1.2,
         ease: "power2.out",
-        }, .6);
-        });
+      },
+      0.6
+    );
+});
 
+(function () {
+  // Constants
+  const CONFIG = {
+    ROTATION_INTERVAL: 7000,
+    ACTIVE_TRANSITION: "height 7s linear",
+    INACTIVE_TRANSITION: "height 0.2s ease",
+    VIEWPORT_THRESHOLD: 0.1,
+    INIT_DELAY: 200,
+    RESTART_DELAY: 1000,
+    ANIMATION_DELAY: 100
+  };
 
-        (function() {
-        const ROTATION_INTERVAL = 7000;
-        const ACTIVE_TRANSITION = 'height 7s linear';
-        const INACTIVE_TRANSITION = 'height 0.2s ease';
+  const SELECTORS = {
+    container: ".customers-tabs",
+    tabMenu: ".w-tab-menu",
+    tabLink: ".w-tab-link",
+    timeline: ".tab-tl_item",
+    feedback: ".tabs-feedback-clw",
+    activePane: ".customers-tab-pane.w--tab-active .tabs-feedback-clw",
+    tabPane: ".customers-tab-pane"
+  };
 
-        const container = document.querySelector('.customers-tabs');
-        if (!container) return;
+  // State management
+  const state = {
+    currentIndex: 0,
+    autoInterval: null,
+    isAutoRotating: false,
+    isInView: false,
+    shouldAutoRotate: false,
+    pausedState: null
+  };
 
-        const tabs = Array.from(
-        container.querySelector('.w-tab-menu')?.querySelectorAll('.w-tab-link') ||
-        container.querySelectorAll('[data-w-tab].w-tab-link') ||
-        container.querySelectorAll('.w-tab-link')
-        ).filter(tab => tab.offsetParent && tab.hasAttribute('data-w-tab'));
+  // DOM elements
+  const container = document.querySelector(SELECTORS.container);
+  if (!container) return;
 
-        if (!tabs.length) return;
+  const tabs = findValidTabs();
+  if (!tabs.length) return;
 
-        let currentIndex = 0;
-        let autoInterval = null;
-        let isAutoRotating = false;
+  // Helper functions
+  function findValidTabs() {
+    const selectors = [
+      `${SELECTORS.container} ${SELECTORS.tabMenu} ${SELECTORS.tabLink}`,
+      `${SELECTORS.container} [data-w-tab]${SELECTORS.tabLink}`,
+      `${SELECTORS.container} ${SELECTORS.tabLink}`
+    ];
 
-        // Timeline management
-        const setTimeline = (element, height, transition = INACTIVE_TRANSITION) => {
-        if (!element) return;
-        element.style.transition = transition;
-        element.style.height = height;
-        };
+    for (const selector of selectors) {
+      const elements = Array.from(document.querySelectorAll(selector));
+      const validTabs = elements.filter(tab => tab.offsetParent && tab.hasAttribute("data-w-tab"));
+      if (validTabs.length) return validTabs;
+    }
+    return [];
+  }
 
-        const resetTimelines = () => {
-        tabs.forEach(tab => {
-        const timeline = tab.querySelector('.tab-tl_item');
+  function getRemainingTime(currentHeight) {
+    const match = currentHeight.match(/(\d+(?:\.\d+)?)/);
+    if (!match) return CONFIG.ROTATION_INTERVAL;
+    
+    const heightPercent = parseFloat(match[0]);
+    const remainingPercent = 100 - heightPercent;
+    const remainingTime = (remainingPercent / 100) * CONFIG.ROTATION_INTERVAL;
+    
+    return Math.max(remainingTime, 100);
+  }
+
+  function isInitiallyInView() {
+    const rect = container.getBoundingClientRect();
+    return rect.top < window.innerHeight && rect.bottom > 0;
+  }
+
+  // Timeline management
+  const Timeline = {
+    setTransition(element, height, transition = CONFIG.INACTIVE_TRANSITION) {
+      if (!element) return;
+      element.style.transition = transition;
+      element.style.height = height;
+    },
+
+    reset() {
+      tabs.forEach(tab => {
+        const timeline = tab.querySelector(SELECTORS.timeline);
         if (timeline) {
-        timeline.style.transition = 'none';
-        timeline.style.height = '0%';
+          timeline.style.transition = "none";
+          timeline.style.height = "0%";
         }
-        });
-        container.offsetHeight;
-        };
+      });
+      container.offsetHeight; // Force reflow
+    },
 
-        const updateTimelines = (activeIndex) => {
-        resetTimelines();
-
-        requestAnimationFrame(() => {
+    update(activeIndex, forceUpdate = false) {
+      if (!state.isInView && !forceUpdate) return;
+      
+      this.reset();
+      
+      requestAnimationFrame(() => {
         tabs.forEach((tab, i) => {
-        const timeline = tab.querySelector('.tab-tl_item');
-        setTimeline(
+          const timeline = tab.querySelector(SELECTORS.timeline);
+          const isActive = i === activeIndex;
+          this.setTransition(
             timeline,
-            i === activeIndex ? '100%' : '0%',
-            i === activeIndex ? ACTIVE_TRANSITION : INACTIVE_TRANSITION
-        );
+            isActive ? "100%" : "0%",
+            isActive ? CONFIG.ACTIVE_TRANSITION : CONFIG.INACTIVE_TRANSITION
+          );
         });
-        });
-        };
+      });
+    },
 
-        // GSAP animations triggered by DOM changes
-        const animateTabContent = () => {
-        // Animate out all feedback elements
-        const allFeedback = document.querySelectorAll('.tabs-feedback-clw');
-        gsap.to(allFeedback, {
+    pause() {
+      tabs.forEach(tab => {
+        const timeline = tab.querySelector(SELECTORS.timeline);
+        if (timeline) {
+          const computedHeight = window.getComputedStyle(timeline).height;
+          timeline.style.transition = "none";
+          timeline.style.height = computedHeight;
+        }
+      });
+
+      state.pausedState = {
+        pausedAt: Date.now(),
+        activeIndex: state.currentIndex
+      };
+    },
+
+    resume() {
+      if (state.pausedState) {
+        this._resumeFromPaused();
+      } else {
+        this._startFresh();
+      }
+      state.pausedState = null;
+    },
+
+    _resumeFromPaused() {
+      const activeTimeline = tabs[state.currentIndex]?.querySelector(SELECTORS.timeline);
+      if (!activeTimeline) return;
+
+      requestAnimationFrame(() => {
+        const currentHeight = activeTimeline.style.height;
+        const remainingTime = getRemainingTime(currentHeight);
+        
+        // Resume active timeline
+        activeTimeline.style.transition = `height ${remainingTime}ms linear`;
+        activeTimeline.style.height = "100%";
+        
+        // Reset inactive timelines
+        tabs.forEach((tab, i) => {
+          if (i !== state.currentIndex) {
+            const timeline = tab.querySelector(SELECTORS.timeline);
+            if (timeline) {
+              timeline.style.transition = CONFIG.INACTIVE_TRANSITION;
+              timeline.style.height = "0%";
+            }
+          }
+        });
+
+        // Schedule next rotation
+        if (state.shouldAutoRotate) {
+          Rotation.scheduleNext(remainingTime);
+        }
+      });
+    },
+
+    _startFresh() {
+      console.log("First time in view - starting fresh");
+      this.update(state.currentIndex, true);
+      if (state.shouldAutoRotate) {
+        Rotation.start();
+      }
+    }
+  };
+
+  // Animation management
+  const Animation = {
+    initFeedback() {
+      const allFeedback = document.querySelectorAll(SELECTORS.feedback);
+      gsap.set(allFeedback, { y: 18, opacity: 0 });
+    },
+
+    updateContent() {
+      const allFeedback = document.querySelectorAll(SELECTORS.feedback);
+      gsap.to(allFeedback, {
         y: 8,
         opacity: 0,
         duration: 0.3,
-        ease: "power2.in"
-        });
+        ease: "power2.in",
+      });
 
-        // Animate in active feedback elements
-        setTimeout(() => {
-        const activePanes = document.querySelectorAll('.customers-tab-pane.w--tab-active .tabs-feedback-clw');
-        if (activePanes.length) {
-        gsap.to(activePanes, {
+      setTimeout(() => {
+        const activeFeedback = document.querySelectorAll(SELECTORS.activePane);
+        if (activeFeedback.length) {
+          gsap.to(activeFeedback, {
             y: 0,
             opacity: 1,
             duration: 0.4,
             ease: "power2.out",
-            stagger: 0.1
-        });
+            stagger: 0.1,
+          });
         }
-        }, 150);
-        };
+      }, 150);
+    },
 
-        // Watch for changes to tab panes
-        const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-        const target = mutation.target;
-        if (target.classList.contains('customers-tab-pane')) {
-            // Tab pane class changed, animate content
-            animateTabContent();
-        }
-        }
-        });
-        });
-
-        // Observe all tab panes for class changes
-        const startObserver = () => {
-        const tabPanes = document.querySelectorAll('.customers-tab-pane');
-        tabPanes.forEach(pane => {
-        observer.observe(pane, { attributes: true, attributeFilter: ['class'] });
-        });
-        };
-
-        // Auto-rotation
-        const nextTab = () => {
-        isAutoRotating = true;
-        currentIndex = (currentIndex + 1) % tabs.length;
-
-        // Update timeline immediately
-        updateTimelines(currentIndex);
-
-        // Click the tab
-        tabs[currentIndex].click();
-
-        setTimeout(() => {
-        isAutoRotating = false;
-        }, 100);
-        };
-
-        const startRotation = () => {
-        clearInterval(autoInterval);
-        autoInterval = setInterval(nextTab, ROTATION_INTERVAL);
-        };
-
-        const stopRotation = () => {
-        clearInterval(autoInterval);
-        autoInterval = null;
-        };
-
-        // Manual click handling - minimal interference
-        tabs.forEach((tab, index) => {
-        tab.addEventListener('click', (e) => {
-        if (e.isTrusted && !isAutoRotating) {
-        stopRotation();
-        currentIndex = index;
-        updateTimelines(currentIndex);
-
-        // Restart rotation after manual click
-        setTimeout(startRotation, 1000);
-        }
-        });
-        });
-
-        // Initialize
-        const initialize = () => {
-        // Set initial state for all feedback elements
-        const allFeedback = document.querySelectorAll('.tabs-feedback-clw');
-        gsap.set(allFeedback, { y: 18, opacity: 0 });
-
-        // Start observing
-        startObserver();
-
-        // Set initial active state
-        setTimeout(() => {
-        const activeFeedback = document.querySelectorAll('.customers-tab-pane.w--tab-active .tabs-feedback-clw');
-        if (activeFeedback.length) {
+    setInitialActive() {
+      const activeFeedback = document.querySelectorAll(SELECTORS.activePane);
+      if (activeFeedback.length) {
         gsap.set(activeFeedback, { y: 0, opacity: 1 });
+      }
+    }
+  };
+
+  // Rotation management
+  const Rotation = {
+    start() {
+      this.stop();
+      state.shouldAutoRotate = true;
+      
+      if (state.isInView) {
+        state.autoInterval = setInterval(() => this.next(), CONFIG.ROTATION_INTERVAL);
+      }
+    },
+
+    stop() {
+      clearInterval(state.autoInterval);
+      state.autoInterval = null;
+      state.shouldAutoRotate = false;
+      state.pausedState = null;
+    },
+
+    pause() {
+      clearInterval(state.autoInterval);
+      state.autoInterval = null;
+    },
+
+    next() {
+      if (!state.isInView) return;
+      
+      state.isAutoRotating = true;
+      state.currentIndex = (state.currentIndex + 1) % tabs.length;
+
+      Timeline.update(state.currentIndex, true);
+      tabs[state.currentIndex].click();
+
+      setTimeout(() => {
+        state.isAutoRotating = false;
+      }, CONFIG.ANIMATION_DELAY);
+    },
+
+    scheduleNext(delay) {
+      clearInterval(state.autoInterval);
+      setTimeout(() => {
+        if (state.isInView && state.shouldAutoRotate) {
+          this.next();
+          state.autoInterval = setInterval(() => this.next(), CONFIG.ROTATION_INTERVAL);
         }
-        updateTimelines(0);
-        startRotation();
-        }, 200);
-        };
+      }, delay);
+    }
+  };
 
-        initialize();
-        })();
+  // Viewport management
+  const Viewport = {
+    createObserver() {
+      const observer = new IntersectionObserver(
+        this.handleIntersection.bind(this),
+        {
+          root: null,
+          rootMargin: '0px',
+          threshold: CONFIG.VIEWPORT_THRESHOLD
+        }
+      );
+      
+      observer.observe(container);
+      return observer;
+    },
 
+    handleIntersection(entries) {
+      entries.forEach(entry => {
+        if (entry.target === container) {
+          const wasInView = state.isInView;
+          state.isInView = entry.isIntersecting;
+          
+          if (state.isInView && !wasInView) {
+            console.log("Tabs came into view");
+            Timeline.resume();
+          } else if (!state.isInView && wasInView) {
+            console.log("Tabs left view - pausing");
+            Timeline.pause();
+            Rotation.pause();
+          }
+        }
+      });
+    }
+  };
 
-        (() => {
-        const MOBILE_BREAKPOINT = 991;
+  // Event management
+  const Events = {
+    setupTabClicks() {
+      tabs.forEach((tab, index) => {
+        tab.addEventListener("click", (e) => {
+          if (e.isTrusted && !state.isAutoRotating) {
+            Rotation.stop();
+            state.currentIndex = index;
+            Timeline.update(state.currentIndex, true);
+            setTimeout(() => Rotation.start(), CONFIG.RESTART_DELAY);
+          }
+        });
+      });
+    },
 
-        const isMobile = () => window.innerWidth < MOBILE_BREAKPOINT;
+    setupMutationObserver() {
+      const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+          if (mutation.type === "attributes" && 
+              mutation.attributeName === "class" &&
+              mutation.target.classList.contains("customers-tab-pane")) {
+            Animation.updateContent();
+          }
+        });
+      });
 
-        if (!isMobile()) return;
+      document.querySelectorAll(SELECTORS.tabPane).forEach(pane => {
+        observer.observe(pane, { 
+          attributes: true, 
+          attributeFilter: ["class"] 
+        });
+      });
+    }
+  };
 
-        const container = document.querySelector('.customers-tabs');
-        if (!container) return;
+  // Initialization
+  function initialize() {
+    Animation.initFeedback();
+    Events.setupMutationObserver();
+    Events.setupTabClicks();
+    Viewport.createObserver();
 
-        // Get tab elements
-        const tabLinks = Array.from(
-        container.querySelector('.w-tab-menu')?.querySelectorAll('.w-tab-link') || []
-        );
+    setTimeout(() => {
+      // Check initial viewport state
+      if (isInitiallyInView()) {
+        state.isInView = true;
+        console.log("Initially in view - starting immediately");
+      }
 
-        const tabPanes = Array.from(
-        document.querySelectorAll('.customers-tab-pane')
-        );
+      Animation.setInitialActive();
+      state.shouldAutoRotate = true;
+      
+      if (state.isInView) {
+        Timeline.update(0, true);
+        state.autoInterval = setInterval(() => Rotation.next(), CONFIG.ROTATION_INTERVAL);
+      }
+    }, CONFIG.INIT_DELAY);
+  }
 
-        if (!tabLinks.length || !tabPanes.length) return;
+  // Start the application
+  initialize();
+})();
 
-        // Transfer function
-        const transferFeedbackElements = () => {
-        tabPanes.forEach((pane, index) => {
-        const transferElement = pane.querySelector('.tabs-feedback_transfer');
-        const targetContainer = tabLinks[index]?.querySelector('.tabs-feedback');
+// Mobile functionality (simplified but unchanged)
+(() => {
+  const MOBILE_BREAKPOINT = 991;
+  const isMobile = () => window.innerWidth < MOBILE_BREAKPOINT;
 
-        if (transferElement && targetContainer) {
+  if (!isMobile()) return;
+
+  const container = document.querySelector(".customers-tabs");
+  if (!container) return;
+
+  const tabLinks = Array.from(
+    container.querySelector(".w-tab-menu")?.querySelectorAll(".w-tab-link") || []
+  );
+  const tabPanes = Array.from(document.querySelectorAll(".customers-tab-pane"));
+
+  if (!tabLinks.length || !tabPanes.length) return;
+
+  function transferFeedbackElements() {
+    tabPanes.forEach((pane, index) => {
+      const transferElement = pane.querySelector(".tabs-feedback_transfer");
+      const targetContainer = tabLinks[index]?.querySelector(".tabs-feedback");
+
+      if (transferElement && targetContainer) {
         targetContainer.appendChild(transferElement);
         console.log(`Transferred feedback from pane ${index} to tab link ${index}`);
-        }
-        });
-        };
+      }
+    });
+  }
 
-        // Handle resize events
-        const handleResize = () => {
-        if (isMobile()) {
-        transferFeedbackElements();
-        }
-        };
+  function initialize() {
+    transferFeedbackElements();
+    window.addEventListener("resize", () => {
+      if (isMobile()) transferFeedbackElements();
+    });
+  }
 
-        // Initialize
-        const init = () => {
-        transferFeedbackElements();
-        window.addEventListener('resize', handleResize);
-        };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initialize);
+  } else {
+    initialize();
+  }
+})();
 
-        // Run when DOM is ready
-        if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-        } else {
-        init();
-        }
-        })();
 
-        if (window.innerWidth > 991) {
-        gsap.defaults({ ease: "power2.out", duration: 0.8 });
-            
-        gsap.utils.toArray(".feature-bl").forEach(trigger => {
-        gsap.fromTo(trigger.querySelectorAll(".tabs-features-feedback-clw"),
-        { x: -120, opacity: 0 },
-        {
+if (window.innerWidth > 991) {
+  gsap.defaults({ ease: "power2.out", duration: 0.8 });
+
+  gsap.utils.toArray(".feature-bl").forEach((trigger) => {
+    gsap.fromTo(
+      trigger.querySelectorAll(".tabs-features-feedback-clw"),
+      { x: -120, opacity: 0 },
+      {
         x: 0,
         opacity: 1,
         stagger: 0.1,
-        scrollTrigger: { 
-        trigger, 
-        // markers: true,
-        start: "20% 80%", 
-        end: "bottom 80%",
-        toggleActions: "play none none reverse" 
-        }
-        }
-        );
-        });
-        }
+        scrollTrigger: {
+          trigger,
+          // markers: true,
+          start: "20% 80%",
+          end: "bottom 80%",
+          toggleActions: "play none none reverse",
+        },
+      }
+    );
+  });
+}
+
+if (window.innerWidth < 990) {
+  gsap.defaults({ ease: "power2.out", duration: 0.8 });
+
+  gsap.utils.toArray(".feature-bl").forEach((trigger) => {
+    gsap.fromTo(
+      trigger.querySelectorAll(".tabs-features-feedback-clw"),
+      { y: -80, opacity: 0 },
+      {
+        y: 0,
+        opacity: 1,
+        stagger: 0.1,
+        scrollTrigger: {
+          trigger,
+          //markers: true,
+          start: "60% 80%",
+          end: "bottom 80%",
+          toggleActions: "play none none reverse",
+        },
+      }
+    );
+  });
+}

@@ -2,8 +2,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Configuration
   const config = {
     counterDuration: 0.4,
-    counterAttributes: ['aware-platform', 'aware-capture', 'plan-base', 'plan-gold', 'plan-team'],
-    planAttributes: ['plan-base', 'plan-gold', 'plan-team'],
+    counterAttributes: ['aware-platform', 'aware-capture', 'first-tier-plan', 'second-tier-plan', 'third-tier-plan', 'fourth-tier-plan'],
+    planAttributes: ['first-tier-plan', 'second-tier-plan', 'third-tier-plan', 'fourth-tier-plan'],
     selectors: {
       container: '.currency-dropdown_cl',
       templateCollection: '.currencies-template_cl',
