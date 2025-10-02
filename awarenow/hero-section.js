@@ -35,13 +35,13 @@ document.addEventListener("DOMContentLoaded", function () {
     ".hero-illustrations_wrap"
   );
   const heroContentItems = document.querySelectorAll("[hero-stag]");
-  const findCityHero = document.querySelector(".home-hero-find-city_holder");
+  const findCityHero = document.querySelector(".home-hero-find-city_wrap-motion");
 
   const currentIllustrationsWidth = heroIllustrationsWrapEl.offsetWidth;
 
-  const gsapDurationS = "0.4";
-  const gsapDurationL = "1.4";
-  const gsapEase = "power2.out";
+  const gsapDurationS = "0.3";
+  const gsapDurationL = ".8";
+  const gsapEase = "power3.out";
 
   // Set initial states
   gsap.set(heroWrapEl, {
@@ -102,7 +102,7 @@ document.addEventListener("DOMContentLoaded", function () {
         duration: gsapDurationS,
         ease: gsapEase,
       },
-      1
+      .1
     );
   });
   // Hero illustrations width animation: at the same time as text stroke
@@ -114,7 +114,7 @@ document.addEventListener("DOMContentLoaded", function () {
       duration: gsapDurationS,
       ease: gsapEase,
     },
-    1
+    .1
   );
 
   // First animation: width, height, border-radius
@@ -135,20 +135,20 @@ document.addEventListener("DOMContentLoaded", function () {
         });
       },
     },
-    1
+    .1
   )
 
     .to(
       aiTagEl,
       {
         opacity: 1,
-        duration: 0.3,
+        duration: 0.6,
         ease: gsapEase,
       },
       "<0.1"
     )
 
-    // Second animation: 1.4s after first animation completes
+    // Second animation: .4s after first animation completes
     .to(
       heroWrapEl,
       {
@@ -158,7 +158,7 @@ document.addEventListener("DOMContentLoaded", function () {
         duration: gsapDurationL,
         ease: gsapEase,
       },
-      "+=1.4"
+      "+=.2"
     )
     .to(
       heroImgWrapEl,
@@ -174,7 +174,7 @@ document.addEventListener("DOMContentLoaded", function () {
       heroImgWrapEl,
       {
         filter: "blur(0px)",
-        duration: 0.6,
+        duration: 0.4,
         ease: gsapEase,
       },
       "<"
@@ -184,7 +184,7 @@ document.addEventListener("DOMContentLoaded", function () {
       aiTagEl,
       {
         opacity: 0,
-        duration: 0.5,
+        duration: 0.3,
         ease: gsapEase,
       },
       "<"
@@ -206,20 +206,20 @@ document.addEventListener("DOMContentLoaded", function () {
       {
         y: 0,
         opacity: 1,
-        duration: 1.6,
+        duration: .8,
         ease: gsapEase,
         stagger: 0.1,
       },
-      "<0.5"
+      "<0.3"
     )
     .to(
       findCityHero,
       {
         height: "var(--_spacing---spacing-utility-rem--7-5rem)",
-        duration: 0.8,
+        duration: .6,
         ease: gsapEase,
       },
-      "-=1.4"
+      "<0.3"
     )
 
     // Text stroke opacity animation - all elements at the same time
@@ -227,9 +227,9 @@ document.addEventListener("DOMContentLoaded", function () {
       heroTextStrokeEls,
       {
         opacity: 0,
-        duration: 0.5,
+        duration: 0.4,
         ease: gsapEase,
       },
-      3 // Starts 0.4s after the width animation
+      1 // Starts 0.4s after the width animation
     );
 });
