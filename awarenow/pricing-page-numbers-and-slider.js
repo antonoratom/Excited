@@ -14,7 +14,6 @@ class SmoothSlider {
         { value: '30000-40000-target', display: '30,000-40,000', range: [30000, 40000] },
         { value: '40000plus-target', display: '40,000+', range: [40000, 0], plus: true }
       ],
-      // Step-specific pricing triggers mapping
       pricingTriggers: {
         0: { platform: 'aware-platform', capture: 'aware-capture' },
         1: { platform: 'aware-platform-5-10', capture: 'aware-capture-5-10' },
@@ -53,7 +52,7 @@ class SmoothSlider {
         const patterns = {
           hasCommas: originalFormat?.includes(','),
           currency: originalFormat?.match(/[$€£¥]/)?.[0] || '',
-          decimals: originalFormat?.match(/\.(\d+)/)?.[1]?.length || (value % 1 !== 0 ? 2 : 0)
+          decimals: originalFormat?.match(/\.(\\d+)/)?.[1]?.length || (value % 1 !== 0 ? 2 : 0)
         };
         
         let formatted = value.toFixed(patterns.decimals);
@@ -64,6 +63,14 @@ class SmoothSlider {
         }
         
         return patterns.currency + formatted;
+      },
+      
+      // NEW: Format pricing numbers without decimals, always with thousand separators
+      formatPricingNumber: (value, originalFormat) => {
+        const currency = originalFormat?.match(/[$€£¥]/)?.[0] || '';
+        const rounded = Math.round(value);
+        const formatted = rounded.toLocaleString('en-US');
+        return currency + formatted;
       },
       
       getElementValue: (element) => element?.textContent?.trim() || element?.value?.trim() || element?.innerText?.trim() || '',
@@ -261,7 +268,6 @@ class SmoothSlider {
     this.animateValue(target, stepData, isInput);
   }
 
-  // Get the appropriate trigger values for current step
   getCurrentPricingValues() {
     const visibleTemplate = this.utils.getVisibleTemplate();
     if (!visibleTemplate) return { platformValue: null, captureValue: null };
@@ -282,161 +288,150 @@ class SmoothSlider {
     return { platformValue, captureValue };
   }
 
-  // Update the initializePricingTargets method
-initializePricingTargets() {
-  const visibleTemplate = this.utils.getVisibleTemplate();
-  if (!visibleTemplate) {
-    setTimeout(() => this.initializePricingTargets(), 300);
-    return;
-  }
-
-  console.log('Initializing pricing targets for step:', this.state.currentStep);
-  
-  // Special case for step 5 (40000+) - set to "Custom"
-  if (this.state.currentStep === 5) {
-    this.setPricingTargetValues('aware-platform-monthly-slider', 'Custom');
-    this.setPricingTargetValues('aware-platform-annual-slider', 'Custom');
-    this.setPricingTargetValues('aware-capture-monthly-slider', 'Custom');
-    this.setPricingTargetValues('aware-capture-annual-slider', 'Custom');
-    return;
-  }
-
-  const { platformValue, captureValue } = this.getCurrentPricingValues();
-
-  if (platformValue !== null) {
-    this.setPricingTargetValues('aware-platform-monthly-slider', platformValue);
-    this.setPricingTargetValues('aware-platform-annual-slider', platformValue * 12);
-  }
-
-  if (captureValue !== null) {
-    this.setPricingTargetValues('aware-capture-monthly-slider', captureValue);
-    this.setPricingTargetValues('aware-capture-annual-slider', captureValue * 12);
-  }
-}
-
-// Update the setPricingTargetValues method to handle text
-setPricingTargetValues(attribute, value) {
-  const targets = this.utils.$$(`[${attribute}="target"]`);
-  
-  targets.forEach(target => {
-    let displayValue;
-    
-    if (typeof value === 'string' && value === 'Custom') {
-      displayValue = 'Custom';
-    } else {
-      const existingValue = this.utils.getElementValue(target);
-      displayValue = existingValue ? 
-        this.utils.formatNumber(value, existingValue) : 
-        this.utils.formatNumber(value, '$0');
-    }
-    
-    target.textContent = displayValue;
-    console.log(`Set ${attribute}: ${displayValue}`);
-  });
-}
-
-// Update the updatePricingTargets method
-updatePricingTargets(animate = true) {
-  setTimeout(() => {
+  initializePricingTargets() {
     const visibleTemplate = this.utils.getVisibleTemplate();
-    if (!visibleTemplate) return;
+    if (!visibleTemplate) {
+      setTimeout(() => this.initializePricingTargets(), 300);
+      return;
+    }
 
-    // Special case for step 5 (40000+) - set to "Custom"
+    console.log('Initializing pricing targets for step:', this.state.currentStep);
+    
     if (this.state.currentStep === 5) {
-      this.updatePricingTarget('aware-platform-monthly-slider', 'Custom', animate);
-      this.updatePricingTarget('aware-platform-annual-slider', 'Custom', animate);
-      this.updatePricingTarget('aware-capture-monthly-slider', 'Custom', animate);
-      this.updatePricingTarget('aware-capture-annual-slider', 'Custom', animate);
+      this.setPricingTargetValues('aware-platform-monthly-slider', 'Custom');
+      this.setPricingTargetValues('aware-platform-annual-slider', 'Custom');
+      this.setPricingTargetValues('aware-capture-monthly-slider', 'Custom');
+      this.setPricingTargetValues('aware-capture-annual-slider', 'Custom');
       return;
     }
 
     const { platformValue, captureValue } = this.getCurrentPricingValues();
 
-    console.log('Updating pricing targets - Platform:', platformValue, 'Capture:', captureValue);
-
     if (platformValue !== null) {
-      this.updatePricingTarget('aware-platform-monthly-slider', platformValue, animate);
-      this.updatePricingTarget('aware-platform-annual-slider', platformValue * 12, animate);
+      this.setPricingTargetValues('aware-platform-monthly-slider', platformValue);
+      this.setPricingTargetValues('aware-platform-annual-slider', platformValue * 12);
     }
 
     if (captureValue !== null) {
-      this.updatePricingTarget('aware-capture-monthly-slider', captureValue, animate);
-      this.updatePricingTarget('aware-capture-annual-slider', captureValue * 12, animate);
+      this.setPricingTargetValues('aware-capture-monthly-slider', captureValue);
+      this.setPricingTargetValues('aware-capture-annual-slider', captureValue * 12);
     }
-  }, 50);
-}
-
-// Update the updatePricingTarget method to handle "Custom" text
-updatePricingTarget(attribute, newValue, animate = true) {
-  const targets = this.utils.$$(`[${attribute}="target"]`);
-  
-  targets.forEach(target => {
-    const currentText = this.utils.getElementValue(target);
-    
-    // Handle "Custom" text case
-    if (newValue === 'Custom') {
-      if (currentText !== 'Custom') {
-        if (animate) {
-          this.animateTextChange(target, 'Custom');
-        } else {
-          target.textContent = 'Custom';
-        }
-      }
-      return;
-    }
-
-    // Handle numeric values
-    const currentValue = this.utils.parseNumeric(currentText);
-    const originalFormat = currentText;
-
-    // If current is "Custom" and new is numeric, animate from 0
-    if (currentText === 'Custom' && typeof newValue === 'number') {
-      if (animate) {
-        this.animateCounter(target, 0, newValue, originalFormat || '$0');
-      } else {
-        target.textContent = this.utils.formatNumber(newValue, originalFormat || '$0');
-      }
-      return;
-    }
-
-    // Regular numeric animation
-    if (Math.abs(currentValue - newValue) > 0.01) {
-      if (animate) {
-        this.animateCounter(target, currentValue || 0, newValue, originalFormat);
-      } else {
-        target.textContent = this.utils.formatNumber(newValue, originalFormat);
-      }
-    }
-  });
-}
-
-// Add new method for animating text changes
-animateTextChange(element, newText) {
-  if (typeof gsap === 'undefined') {
-    element.textContent = newText;
-    return;
   }
 
-  // Simple fade transition for text changes
-  gsap.to(element, {
-    opacity: 0,
-    duration: 0.2,
-    ease: "power2.out",
-    onComplete: () => {
-      element.textContent = newText;
-      gsap.to(element, {
-        opacity: 1,
-        duration: 0.2,
-        ease: "power2.out"
-      });
-    }
-  });
-}
+  setPricingTargetValues(attribute, value) {
+    const targets = this.utils.$$(`[${attribute}="target"]`);
+    
+    targets.forEach(target => {
+      let displayValue;
+      
+      if (typeof value === 'string' && value === 'Custom') {
+        displayValue = 'Custom';
+      } else {
+        const existingValue = this.utils.getElementValue(target);
+        const currency = existingValue?.match(/[$€£¥]/)?.[0] || '';
+        displayValue = this.utils.formatPricingNumber(value, existingValue || currency + '0');
+      }
+      
+      target.textContent = displayValue;
+      console.log(`Set ${attribute}: ${displayValue}`);
+    });
+  }
 
+  updatePricingTargets(animate = true) {
+    setTimeout(() => {
+      const visibleTemplate = this.utils.getVisibleTemplate();
+      if (!visibleTemplate) return;
 
-  animateCounter(element, fromValue, toValue, originalFormat) {
+      if (this.state.currentStep === 5) {
+        this.updatePricingTarget('aware-platform-monthly-slider', 'Custom', animate);
+        this.updatePricingTarget('aware-platform-annual-slider', 'Custom', animate);
+        this.updatePricingTarget('aware-capture-monthly-slider', 'Custom', animate);
+        this.updatePricingTarget('aware-capture-annual-slider', 'Custom', animate);
+        return;
+      }
+
+      const { platformValue, captureValue } = this.getCurrentPricingValues();
+
+      console.log('Updating pricing targets - Platform:', platformValue, 'Capture:', captureValue);
+
+      if (platformValue !== null) {
+        this.updatePricingTarget('aware-platform-monthly-slider', platformValue, animate);
+        this.updatePricingTarget('aware-platform-annual-slider', platformValue * 12, animate);
+      }
+
+      if (captureValue !== null) {
+        this.updatePricingTarget('aware-capture-monthly-slider', captureValue, animate);
+        this.updatePricingTarget('aware-capture-annual-slider', captureValue * 12, animate);
+      }
+    }, 50);
+  }
+
+  updatePricingTarget(attribute, newValue, animate = true) {
+    const targets = this.utils.$$(`[${attribute}="target"]`);
+    
+    targets.forEach(target => {
+      const currentText = this.utils.getElementValue(target);
+      
+      if (newValue === 'Custom') {
+        if (currentText !== 'Custom') {
+          if (animate) {
+            this.animateTextChange(target, 'Custom');
+          } else {
+            target.textContent = 'Custom';
+          }
+        }
+        return;
+      }
+
+      const currentValue = this.utils.parseNumeric(currentText);
+      const originalFormat = currentText;
+
+      if (currentText === 'Custom' && typeof newValue === 'number') {
+        if (animate) {
+          this.animateCounter(target, 0, newValue, originalFormat || '$0', true);
+        } else {
+          target.textContent = this.utils.formatPricingNumber(newValue, originalFormat || '$0');
+        }
+        return;
+      }
+
+      if (Math.abs(currentValue - newValue) > 0.01) {
+        if (animate) {
+          this.animateCounter(target, currentValue || 0, newValue, originalFormat, true);
+        } else {
+          target.textContent = this.utils.formatPricingNumber(newValue, originalFormat);
+        }
+      }
+    });
+  }
+
+  animateTextChange(element, newText) {
     if (typeof gsap === 'undefined') {
-      element.textContent = this.utils.formatNumber(toValue, originalFormat);
+      element.textContent = newText;
+      return;
+    }
+
+    gsap.to(element, {
+      opacity: 0,
+      duration: 0.2,
+      ease: "power2.out",
+      onComplete: () => {
+        element.textContent = newText;
+        gsap.to(element, {
+          opacity: 1,
+          duration: 0.2,
+          ease: "power2.out"
+        });
+      }
+    });
+  }
+
+  animateCounter(element, fromValue, toValue, originalFormat, isPricing = false) {
+    if (typeof gsap === 'undefined') {
+      const formatted = isPricing ? 
+        this.utils.formatPricingNumber(toValue, originalFormat) : 
+        this.utils.formatNumber(toValue, originalFormat);
+      element.textContent = formatted;
       return;
     }
 
@@ -446,10 +441,16 @@ animateTextChange(element, newText) {
       duration: 0.4,
       ease: "power2.out",
       onUpdate: () => {
-        element.textContent = this.utils.formatNumber(counterObj.value, originalFormat);
+        const formatted = isPricing ? 
+          this.utils.formatPricingNumber(counterObj.value, originalFormat) : 
+          this.utils.formatNumber(counterObj.value, originalFormat);
+        element.textContent = formatted;
       },
       onComplete: () => {
-        element.textContent = this.utils.formatNumber(toValue, originalFormat);
+        const formatted = isPricing ? 
+          this.utils.formatPricingNumber(toValue, originalFormat) : 
+          this.utils.formatNumber(toValue, originalFormat);
+        element.textContent = formatted;
       }
     });
   }
@@ -511,7 +512,6 @@ animateTextChange(element, newText) {
     }));
   }
 
-  // Public API
   setStep(step, animate = true) {
     this.updateSlider(step, animate);
   }
@@ -529,77 +529,108 @@ animateTextChange(element, newText) {
   }
 }
 
+
 // Initialize with proper timing
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
-    const sliderContainer = document.querySelector('.slider-container');
+    const sliderContainer = document.querySelector(".slider-container");
     if (sliderContainer) {
       window.citySlider = new SmoothSlider(sliderContainer);
 
-      sliderContainer.addEventListener('cityResidentsChanged', (e) => {
-        console.log('Slider changed to step:', e.detail.step);
+      sliderContainer.addEventListener("cityResidentsChanged", (e) => {
+        console.log("Slider changed to step:", e.detail.step);
       });
     }
   }, 100);
 
   const config = {
     counterDuration: 0.4,
-    counterAttributes: ['aware-platform', 'aware-capture', 'first-tier-plan', 'second-tier-plan', 'third-tier-plan', 'fourth-tier-plan'],
-    planAttributes: ['first-tier-plan', 'second-tier-plan', 'third-tier-plan', 'fourth-tier-plan'],
+    counterAttributes: [
+      "aware-platform",
+      "aware-capture",
+      "first-tier-plan",
+      "second-tier-plan",
+      "third-tier-plan",
+      "fourth-tier-plan",
+    ],
+    planAttributes: [
+      "first-tier-plan",
+      "second-tier-plan",
+      "third-tier-plan",
+      "fourth-tier-plan",
+    ],
     selectors: {
-      container: '.currency-dropdown_cl',
-      templateCollection: '.currencies-template_cl',
-      currencyCheckbox: '.currency-select-checkbox',
-      pricingTabs: '[pricing-tabs]',
+      container: ".currency-dropdown_cl",
+      templateCollection: ".currencies-template_cl",
+      currencyCheckbox: ".currency-select-checkbox",
+      pricingTabs: "[pricing-tabs]",
       monthlyTab: '[data-w-tab="Monthly"]',
       annualTab: '[data-w-tab="Annual"]',
-      currentTab: '[data-w-tab].w--current'
-    }
+      currentTab: "[data-w-tab].w--current",
+    },
   };
 
   // State management
   const state = {
     originalMonthlyValues: {},
-    currentSavingPercentage: 0
+    currentSavingPercentage: 0,
   };
 
   // Utility functions
   const utils = {
-    $(selector, context = document) { return context.querySelector(selector); },
-    $$(selector, context = document) { return Array.from(context.querySelectorAll(selector)); },
-    
+    $(selector, context = document) {
+      return context.querySelector(selector);
+    },
+    $$(selector, context = document) {
+      return Array.from(context.querySelectorAll(selector));
+    },
+
     parseNumeric: (text) => {
       if (!text) return null;
-      const num = parseFloat(text.toString().replace(/[$,\s€£¥]/g, ''));
+      const num = parseFloat(text.toString().replace(/[$,\s€£¥]/g, ""));
       return isNaN(num) ? null : num;
     },
-    
+
     formatNumber: (value, originalFormat) => {
       const patterns = {
-        hasCommas: originalFormat?.includes(','),
-        currency: originalFormat?.match(/[$€£¥]/)?.[0] || '',
-        decimals: originalFormat?.match(/\.(\d+)/)?.[1]?.length || (value % 1 !== 0 ? 2 : 0)
+        hasCommas: originalFormat?.includes(","),
+        currency: originalFormat?.match(/[$€£¥]/)?.[0] || "",
+        decimals:
+          originalFormat?.match(/\.(\d+)/)?.[1]?.length ||
+          (value % 1 !== 0 ? 2 : 0),
       };
-      
+
       let formatted = value.toFixed(patterns.decimals);
-      
+
       if (patterns.hasCommas && value >= 1000) {
-        const [whole, decimal] = formatted.split('.');
-        formatted = [whole.replace(/\B(?=(\d{3})+(?!\d))/g, ','), decimal].filter(Boolean).join('.');
+        const [whole, decimal] = formatted.split(".");
+        formatted = [whole.replace(/\B(?=(\d{3})+(?!\d))/g, ","), decimal]
+          .filter(Boolean)
+          .join(".");
       }
-      
+
       return patterns.currency + formatted;
     },
-    
-    getElementValue: (element) => element?.textContent?.trim() || element?.value?.trim() || element?.innerText?.trim() || '',
-    
-    isAnnualActive: () => utils.$(config.selectors.currentTab, utils.$(config.selectors.pricingTabs))?.getAttribute('data-w-tab') === 'Annual',
-    
-    getVisibleTemplate: () => templateItems.find(item => 
-      ['flex', 'block'].some(display => 
-        window.getComputedStyle(item).display === display || item.style.display === display
-      )
-    )
+
+    getElementValue: (element) =>
+      element?.textContent?.trim() ||
+      element?.value?.trim() ||
+      element?.innerText?.trim() ||
+      "",
+
+    isAnnualActive: () =>
+      utils
+        .$(config.selectors.currentTab, utils.$(config.selectors.pricingTabs))
+        ?.getAttribute("data-w-tab") === "Annual",
+
+    getVisibleTemplate: () =>
+      templateItems.find((item) =>
+        ["flex", "block"].some(
+          (display) =>
+            window.getComputedStyle(item).display === display ||
+            item.style.display === display
+        )
+      ),
   };
 
   // Initialize
@@ -607,8 +638,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const templateCollection = utils.$(config.selectors.templateCollection);
   if (!container) return;
 
-  const templateItems = utils.$$(config.selectors.templateCollection + ' [selected-currency]');
-  
+  const templateItems = utils.$$(
+    config.selectors.templateCollection + " [selected-currency]"
+  );
+
   // Initialize first radio and setup
   const initializeApp = () => {
     const firstRadio = utils.$('input[type="radio"]', container);
@@ -616,7 +649,7 @@ document.addEventListener("DOMContentLoaded", () => {
       firstRadio.checked = true;
       updateTargets();
     }
-    
+
     setTimeout(() => {
       setupEventListeners();
     }, 10);
@@ -625,9 +658,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // Event listeners
   const setupEventListeners = () => {
     // Radio button changes
-    ['change', 'input'].forEach(event => {
+    ["change", "input"].forEach((event) => {
       document.addEventListener(event, (e) => {
-        if (e.target.type === 'radio' && e.target.closest(config.selectors.container)) {
+        if (
+          e.target.type === "radio" &&
+          e.target.closest(config.selectors.container)
+        ) {
           handleRadioChange();
         }
       });
@@ -636,12 +672,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // Tab listeners
     const pricingTabs = utils.$(config.selectors.pricingTabs);
     if (pricingTabs) {
-      [config.selectors.monthlyTab, config.selectors.annualTab].forEach(selector => {
-        const tab = utils.$(selector, pricingTabs);
-        if (tab) {
-          tab.addEventListener('click', () => setTimeout(handleTabSwitch, 100));
+      [config.selectors.monthlyTab, config.selectors.annualTab].forEach(
+        (selector) => {
+          const tab = utils.$(selector, pricingTabs);
+          if (tab) {
+            tab.addEventListener("click", () =>
+              setTimeout(handleTabSwitch, 100)
+            );
+          }
         }
-      });
+      );
     }
   };
 
@@ -650,64 +690,75 @@ document.addEventListener("DOMContentLoaded", () => {
     const currencyCheckbox = utils.$(config.selectors.currencyCheckbox);
     if (currencyCheckbox) {
       currencyCheckbox.checked = false;
-      currencyCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+      currencyCheckbox.dispatchEvent(new Event("change", { bubbles: true }));
     }
     updateTargets();
   };
 
-const updatePlanSaving = () => {
-  const visibleTemplate = utils.getVisibleTemplate();
-  if (!visibleTemplate) return;
+  const updatePlanSaving = () => {
+    const visibleTemplate = utils.getVisibleTemplate();
+    if (!visibleTemplate) return;
 
-  const trigger = utils.$('[plan-saving="trigger"]', visibleTemplate);
-  const triggerValue = utils.getElementValue(trigger);
-  if (!triggerValue) return;
+    const trigger = utils.$('[plan-saving="trigger"]', visibleTemplate);
+    const triggerValue = utils.getElementValue(trigger);
+    if (!triggerValue) return;
 
-  const targets = utils.$$('[plan-saving="target"]');
-  targets.forEach(target => {
-    const currentValue = utils.getElementValue(target);
-    if (currentValue !== triggerValue) {
-      target.textContent = triggerValue;
-    }
-  });
-};
-
+    const targets = utils.$$('[plan-saving="target"]');
+    targets.forEach((target) => {
+      const currentValue = utils.getElementValue(target);
+      if (currentValue !== triggerValue) {
+        target.textContent = triggerValue;
+      }
+    });
+  };
 
   const updateTargets = () => {
     const checkedRadio = utils.$('input[type="radio"]:checked', container);
     if (!checkedRadio) return;
 
     // Update dropdown elements
-    const radioContainer = checkedRadio.closest('label') || checkedRadio.parentElement;
+    const radioContainer =
+      checkedRadio.closest("label") || checkedRadio.parentElement;
     const updates = [
-      { trigger: 'drpdwn-label', target: 'drpdwn-label', props: ['textContent', 'value'] },
-      { trigger: 'drpdwn-icon', target: 'drpdwn-icon', props: ['src', 'innerHTML', 'className'] }
+      {
+        trigger: "drpdwn-label",
+        target: "drpdwn-label",
+        props: ["textContent", "value"],
+      },
+      {
+        trigger: "drpdwn-icon",
+        target: "drpdwn-icon",
+        props: ["src", "innerHTML", "className"],
+      },
     ];
 
     updates.forEach(({ trigger, target, props }) => {
-      const triggerEl = utils.$(`[${trigger}="trigger"]`, radioContainer) || utils.$(`[${trigger}="trigger"]`, container);
+      const triggerEl =
+        utils.$(`[${trigger}="trigger"]`, radioContainer) ||
+        utils.$(`[${trigger}="trigger"]`, container);
       const targetEl = utils.$(`[${target}="target"]`);
       if (triggerEl && targetEl) {
-        props.forEach(prop => {
+        props.forEach((prop) => {
           if (triggerEl[prop] !== undefined) targetEl[prop] = triggerEl[prop];
         });
       }
     });
 
-// Update template collection and dynamic data
-  const targetLabel = utils.$('[drpdwn-label="target"]');
-  updateTemplateCollection(utils.getElementValue(targetLabel));
-  updateDynamicCurrency();
-  updatePlanSaving(); // Add this line
-  
-  setTimeout(updateCounters, 100);
+    // Update template collection and dynamic data
+    const targetLabel = utils.$('[drpdwn-label="target"]');
+    updateTemplateCollection(utils.getElementValue(targetLabel));
+    updateDynamicCurrency();
+    updatePlanSaving(); // Add this line
+
+    setTimeout(updateCounters, 100);
   };
 
   const updateTemplateCollection = (currency) => {
     if (!templateItems.length || !currency) return;
-    
-    templateItems.forEach(item => {
-      item.style.display = item.getAttribute('selected-currency') === currency ? 'flex' : 'none';
+
+    templateItems.forEach((item) => {
+      item.style.display =
+        item.getAttribute("selected-currency") === currency ? "flex" : "none";
     });
   };
 
@@ -719,7 +770,7 @@ const updatePlanSaving = () => {
     const triggerValue = utils.getElementValue(trigger);
     if (!triggerValue) return;
 
-    utils.$$('[dynamic-currency="target"]').forEach(target => {
+    utils.$$('[dynamic-currency="target"]').forEach((target) => {
       const currentValue = utils.getElementValue(target);
       if (currentValue !== triggerValue) {
         animateTextUpdate(target, triggerValue);
@@ -732,27 +783,32 @@ const updatePlanSaving = () => {
     if (!visibleTemplate) return;
 
     // Process all counter attributes
-    config.counterAttributes.forEach(attribute => {
+    config.counterAttributes.forEach((attribute) => {
       const trigger = utils.$(`[${attribute}="trigger"]`, visibleTemplate);
       const triggerValue = utils.parseNumeric(utils.getElementValue(trigger));
-      
+
       if (triggerValue === null) return;
 
       const targets = utils.$$(`[${attribute}="target"]`);
-      targets.forEach(target => {
+      targets.forEach((target) => {
         const currentValue = utils.parseNumeric(utils.getElementValue(target));
-        
+
         // Store monthly values for plan attributes
         if (config.planAttributes.includes(attribute)) {
           state.originalMonthlyValues[attribute] = triggerValue;
-          
+
           // Skip direct update if on annual plan
           if (utils.isAnnualActive()) return;
         }
 
         // Animate counter if values differ
         if (currentValue !== triggerValue) {
-          animateCounter(target, currentValue || 0, triggerValue, utils.getElementValue(target));
+          animateCounter(
+            target,
+            currentValue || 0,
+            triggerValue,
+            utils.getElementValue(target)
+          );
         }
       });
     });
@@ -765,13 +821,16 @@ const updatePlanSaving = () => {
 
   // Tab switching functions
   const handleTabSwitch = () => {
-    const currentTab = utils.$(config.selectors.currentTab, utils.$(config.selectors.pricingTabs));
+    const currentTab = utils.$(
+      config.selectors.currentTab,
+      utils.$(config.selectors.pricingTabs)
+    );
     if (!currentTab) return;
 
-    const tabType = currentTab.getAttribute('data-w-tab');
+    const tabType = currentTab.getAttribute("data-w-tab");
     console.log(`Tab switched to: ${tabType}`);
 
-    tabType === 'Monthly' ? switchToMonthlyPricing() : switchToAnnualPricing();
+    tabType === "Monthly" ? switchToMonthlyPricing() : switchToAnnualPricing();
   };
 
   const switchToAnnualPricing = () => {
@@ -780,27 +839,37 @@ const updatePlanSaving = () => {
 
     state.currentSavingPercentage = savingPercentage;
 
-    config.planAttributes.forEach(planAttr => {
+    config.planAttributes.forEach((planAttr) => {
       const monthlyValue = state.originalMonthlyValues[planAttr];
       if (monthlyValue == null) return;
 
       const annualValue = monthlyValue * (1 - savingPercentage / 100) * 12;
-      
-      utils.$$(`[${planAttr}="target"]`).forEach(target => {
+
+      utils.$$(`[${planAttr}="target"]`).forEach((target) => {
         const currentValue = utils.parseNumeric(utils.getElementValue(target));
-        animateCounter(target, currentValue || monthlyValue, annualValue, utils.getElementValue(target));
+        animateCounter(
+          target,
+          currentValue || monthlyValue,
+          annualValue,
+          utils.getElementValue(target)
+        );
       });
     });
   };
 
   const switchToMonthlyPricing = () => {
-    config.planAttributes.forEach(planAttr => {
+    config.planAttributes.forEach((planAttr) => {
       const monthlyValue = state.originalMonthlyValues[planAttr];
       if (monthlyValue == null) return;
 
-      utils.$$(`[${planAttr}="target"]`).forEach(target => {
+      utils.$$(`[${planAttr}="target"]`).forEach((target) => {
         const currentValue = utils.parseNumeric(utils.getElementValue(target));
-        animateCounter(target, currentValue || 0, monthlyValue, monthlyValue.toString());
+        animateCounter(
+          target,
+          currentValue || 0,
+          monthlyValue,
+          monthlyValue.toString()
+        );
       });
     });
   };
@@ -815,7 +884,7 @@ const updatePlanSaving = () => {
 
   // Animation functions
   const animateCounter = (element, fromValue, toValue, originalFormat) => {
-    if (typeof gsap === 'undefined') {
+    if (typeof gsap === "undefined") {
       element.textContent = utils.formatNumber(toValue, originalFormat);
       return;
     }
@@ -826,37 +895,40 @@ const updatePlanSaving = () => {
       duration: config.counterDuration,
       ease: "power2.out",
       onUpdate: () => {
-        element.textContent = utils.formatNumber(counterObj.value, originalFormat);
+        element.textContent = utils.formatNumber(
+          counterObj.value,
+          originalFormat
+        );
       },
       onComplete: () => {
         element.textContent = utils.formatNumber(toValue, originalFormat);
-      }
+      },
     });
   };
 
   const animateTextUpdate = (element, newText) => {
-    if (typeof gsap === 'undefined') {
+    if (typeof gsap === "undefined") {
       element.textContent = newText;
       return;
     }
 
     // Ensure proper positioning
-    if (window.getComputedStyle(element).position === 'static') {
-      element.style.position = 'relative';
+    if (window.getComputedStyle(element).position === "static") {
+      element.style.position = "relative";
     }
 
     // Create or get wrapper
     let wrapper = element.parentElement;
-    if (!wrapper.classList.contains('currency-animation-wrapper')) {
-      wrapper = Object.assign(document.createElement('div'), {
-        className: 'currency-animation-wrapper'
+    if (!wrapper.classList.contains("currency-animation-wrapper")) {
+      wrapper = Object.assign(document.createElement("div"), {
+        className: "currency-animation-wrapper",
       });
-      
+
       Object.assign(wrapper.style, {
-        position: 'relative',
-        display: 'inline-block'
+        position: "relative",
+        display: "inline-block",
       });
-      
+
       element.parentNode.insertBefore(wrapper, element);
       wrapper.appendChild(element);
     }
@@ -865,10 +937,10 @@ const updatePlanSaving = () => {
     const newElement = element.cloneNode(true);
     newElement.textContent = newText;
     Object.assign(newElement.style, {
-      position: 'absolute',
-      top: '0',
-      left: '0',
-      width: '100%'
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
     });
 
     gsap.set(newElement, { opacity: 0, scale: 0.5, y: 12 });
@@ -880,11 +952,18 @@ const updatePlanSaving = () => {
         element.textContent = newText;
         gsap.set(element, { opacity: 1, scale: 1, y: 0 });
         newElement.remove();
-      }
+      },
     });
 
-    tl.to(element, { opacity: 0, scale: 0.3, y: -12, duration: 0.3, ease: "power2.in" }, 0)
-      .to(newElement, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.15);
+    tl.to(
+      element,
+      { opacity: 0, scale: 0.3, y: -12, duration: 0.3, ease: "power2.in" },
+      0
+    ).to(
+      newElement,
+      { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: "power2.out" },
+      0.15
+    );
   };
 
   // Initialize the application
