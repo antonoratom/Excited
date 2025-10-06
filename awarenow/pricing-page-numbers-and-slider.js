@@ -52,7 +52,7 @@ class SmoothSlider {
         const patterns = {
           hasCommas: originalFormat?.includes(','),
           currency: originalFormat?.match(/[$€£¥]/)?.[0] || '',
-          decimals: originalFormat?.match(/\.(\\d+)/)?.[1]?.length || (value % 1 !== 0 ? 2 : 0)
+          decimals: originalFormat?.match(/\.(\d+)/)?.[1]?.length || (value % 1 !== 0 ? 2 : 0)
         };
         
         let formatted = value.toFixed(patterns.decimals);
@@ -574,6 +574,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const state = {
     originalMonthlyValues: {},
     currentSavingPercentage: 0,
+    originalPlanTypeValues: {} // NEW: Store original plan-type values
   };
 
   // Utility functions
@@ -631,6 +632,13 @@ document.addEventListener("DOMContentLoaded", () => {
             item.style.display === display
         )
       ),
+
+    // NEW: Find plan-type element (sibling of parent container)
+    findPlanTypeElement: (target) => 
+      target.parentElement?.nextElementSibling?.hasAttribute('plan-type') 
+        ? target.parentElement.nextElementSibling
+        : target.parentElement?.parentElement?.querySelector('[plan-type]') 
+          ?? target.closest('.dynamic-price_wrap')?.parentElement?.querySelector('[plan-type]')
   };
 
   // Initialize
@@ -642,6 +650,32 @@ document.addEventListener("DOMContentLoaded", () => {
     config.selectors.templateCollection + " [selected-currency]"
   );
 
+  // NEW: Store original plan-type values
+  const storeOriginalPlanTypeValues = () => {
+    config.planAttributes.forEach(planAttr => {
+      utils.$$(`[${planAttr}="target"]`).forEach((target, index) => {
+        const planTypeElement = utils.findPlanTypeElement(target);
+        if (planTypeElement) {
+          state.originalPlanTypeValues[`${planAttr}-${index}`] = utils.getElementValue(planTypeElement);
+        }
+      });
+    });
+  };
+
+  // NEW: Update plan-type elements
+  const updatePlanTypeElements = (isAnnual) => {
+    config.planAttributes.forEach(planAttr => {
+      utils.$$(`[${planAttr}="target"]`).forEach((target, index) => {
+        const planTypeElement = utils.findPlanTypeElement(target);
+        if (!planTypeElement) return;
+        
+        planTypeElement.textContent = isAnnual 
+          ? '/year' 
+          : state.originalPlanTypeValues[`${planAttr}-${index}`] ?? planTypeElement.textContent;
+      });
+    });
+  };
+
   // Initialize first radio and setup
   const initializeApp = () => {
     const firstRadio = utils.$('input[type="radio"]', container);
@@ -651,10 +685,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     setTimeout(() => {
+      storeOriginalPlanTypeValues(); // NEW: Store original values
       setupEventListeners();
     }, 10);
   };
 
+  
   // Event listeners
   const setupEventListeners = () => {
     // Radio button changes
@@ -748,9 +784,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const targetLabel = utils.$('[drpdwn-label="target"]');
     updateTemplateCollection(utils.getElementValue(targetLabel));
     updateDynamicCurrency();
-    updatePlanSaving(); // Add this line
+    updatePlanSaving();
 
-    setTimeout(updateCounters, 100);
+    setTimeout(() => {
+      updateCounters();
+      storeOriginalPlanTypeValues(); // NEW: Re-store values after currency change
+    }, 100);
   };
 
   const updateTemplateCollection = (currency) => {
@@ -855,6 +894,9 @@ document.addEventListener("DOMContentLoaded", () => {
         );
       });
     });
+
+    // NEW: Update plan-type to '/year'
+    updatePlanTypeElements(true);
   };
 
   const switchToMonthlyPricing = () => {
@@ -872,6 +914,9 @@ document.addEventListener("DOMContentLoaded", () => {
         );
       });
     });
+
+    // NEW: Restore original plan-type values
+    updatePlanTypeElements(false);
   };
 
   const getSavingPercentage = () => {
