@@ -367,6 +367,40 @@ const handleNoneCheckbox = (groupName) => {
   );
 
   // ===================================
+// FORM CLOSE LOGIC WITH SUCCESS CHECK
+// ===================================
+
+const handleFormClose = () => {
+  document.addEventListener('click', (e) => {
+    const closeButton = e.target.closest('[close-modal-trigger]');
+    if (!closeButton) return;
+    
+    const section = closeButton.closest('.section.for-form');
+    if (!section) return;
+    
+    // Check if success message is visible
+    const successMessage = section.querySelector('.form-success-message_wrap');
+    if (successMessage) {
+      const isVisible = window.getComputedStyle(successMessage).display !== 'none';
+      
+      if (isVisible) {
+        // Success message is showing - skip confirmation modal
+        e.stopPropagation(); // Stop the global handler from running
+        e.preventDefault();
+        
+        console.log('✓ Success message visible - closing without confirmation');
+        
+        // Close the form directly
+        if (window.FormModalManager) {
+          window.FormModalManager.animateClose(section);
+        }
+      }
+    }
+  }, true); // Use capture phase to run before global handler
+};
+
+
+  // ===================================
   // CUSTOM DROPDOWN TRACKING
   // ===================================
   
@@ -396,14 +430,15 @@ const handleNoneCheckbox = (groupName) => {
       });
   };
 
- // ===================================
+// ===================================
 // INITIALIZATION
 // ===================================
 
 handleConditionalCheckboxes();
-handleNoneCheckbox('on-site');   // Handle on-site "None" checkbox
-handleNoneCheckbox('off-site');  // Handle off-site "None" checkbox
+handleNoneCheckbox('on-site');
+handleNoneCheckbox('off-site');
 handleMergedSelects();
+handleFormClose(); // Add this line
 queryAll(document, '.conditional-subvalue_group').forEach(handleSubvalueGroup);
 trackDropdownChanges();
 });

@@ -365,4 +365,5 @@ const FormModalManager = {
 // Initialize Form Modal Manager
 document.addEventListener('DOMContentLoaded', () => {
   FormModalManager.init();
+  window.FormModalManager = FormModalManager; // Expose globally
 });
