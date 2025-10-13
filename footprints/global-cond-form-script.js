@@ -124,12 +124,15 @@ class ConditionalFormManager {
     this.elements.nextButton.disabled = false;
     this.elements.nextButton.classList.remove("disabled");
     this.elements.nextButton.removeAttribute("title");
+    this.elements.nextButton.setAttribute("tabindex", "1");
+
   }
 
   disableNextButton(message = "Please complete all required fields") {
     this.elements.nextButton.disabled = true;
     this.elements.nextButton.classList.add("disabled");
     this.elements.nextButton.setAttribute("title", message);
+    this.elements.nextButton.setAttribute("tabindex", "-1");
   }
 
   resetToFirstStep() {
