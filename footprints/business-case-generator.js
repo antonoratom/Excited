@@ -100,22 +100,32 @@ document.addEventListener("DOMContentLoaded", () => {
     const container = document.querySelector("#merged-selects");
     if (!container) return;
 
-    // Populate year select
-    const yearSelect = document.querySelector("#customYears");
-    if (yearSelect) {
-      const currentYear = new Date().getFullYear();
-      const placeholder = yearSelect.querySelector('option[value=""]');
+// Populate year select
+const yearSelect = document.querySelector("#customYears");
+if (!yearSelect) return;
 
-      yearSelect.innerHTML = placeholder?.outerHTML || "";
-      Array.from({ length: 6 }, (_, i) => currentYear + i).forEach((year) => {
-        yearSelect.insertAdjacentHTML(
-          "beforeend",
-          `<option value="${year}">${year}</option>`
-        );
-      });
+const now = new Date();
+const currentYear = now.getFullYear();
+const monthsLeft = 11 - now.getMonth(); // 0-based month; 11 = December
 
-      console.log(`✓ Years populated: ${currentYear}-${currentYear + 5}`);
-    }
+const keep = (el) => (html) => (el.innerHTML = html, el);
+const appendOptions = (el, years) =>
+    years.forEach((y) => el.insertAdjacentHTML("beforeend", `<option value="${y}">${y}</option>`));
+
+const placeholder = yearSelect.querySelector('option[value=""]')?.outerHTML || "";
+keep(yearSelect)(placeholder);
+
+const years = Array.from({ length: 6 }, (_, i) => currentYear + i);
+appendOptions(yearSelect, monthsLeft < 2 ? years.slice(1) : years);
+
+console.log(
+    `✓ Years populated: ${
+        (monthsLeft < 2 ? years.slice(1) : years)[0]
+    }-${(monthsLeft < 2 ? years.slice(1) : years).at(-1)}${
+        monthsLeft < 2 ? " (current year skipped)" : ""
+    }`
+);
+
 
     const selects = queryAll(container, "select");
     const targetInput = container.querySelector('input[type="text"]');
