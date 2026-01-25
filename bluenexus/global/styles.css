@@ -1,0 +1,188 @@
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+        }
+
+        [path-follow] {
+            color: green;
+            opacity: 0;
+        }
+
+        .hero-canvas-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .svg-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* padding: 2rem; */
+            max-width: 100%;
+            overflow: visible;
+        }
+
+        .svg-container svg {
+            width: 100%;
+            height: auto;
+            overflow: visible;
+            max-width: 1400px;
+            max-height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.08));
+            shape-rendering: geometricPrecision;
+            text-rendering: geometricPrecision;
+        }
+
+        [left-side-path],
+        [right-side-path] {
+            stroke-dasharray: 1;
+            stroke-dashoffset: 1;
+        }
+
+        [left-side-path] {
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+
+        .svg-container .logo {
+            filter: grayscale(100) brightness(0.95);
+            transform: scale(.92);
+            transition: filter 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s ease;
+            position: relative;
+            z-index: 1;
+            opacity: 0.85;
+        }
+
+        .svg-container .logo.with-color {
+            filter: grayscale(0) brightness(1);
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        /* .svg-container .logo:hover {
+            filter: grayscale(0) brightness(1.05);
+            transform: scale(1.05);
+            z-index: 10;
+            transition: filter 0.2s ease, transform 0.2s ease;
+        } */
+
+        .svg-container :is(.logo, [logo-pulse]) {
+            transform-box: fill-box;
+            transform-origin: center;
+            animation: none;
+        }
+
+        /* animation runs ONLY when .to-pulse is present */
+        .svg-container .logo.to-pulse [logo-pulse] {
+            animation: logoPulseBg 1.2s ease-out;
+        }
+
+        .svg-container .logo.to-pulse {
+            animation: logoPulse .7s ease-out;
+        }
+        [logo-dot].for-gray {
+            fill: #E1E1E1;
+        }
+        [random-circle]{
+            opacity:.0;
+            /* transition: opacity .3s ease-out; */
+        }
+        [final-path] {
+            color: transparent
+        }
+        [random-circle].for-blue {
+            fill: #598AFF;
+            opacity: 1;
+        }
+        [random-circle].for-gray {
+            fill: #E1E1E1;
+            opacity: 1;
+        }
+        [random-circle].for-gray.to-hide {
+            opacity: 0;
+        }
+        [random-circle].for-blue.to-hide {
+            opacity: 0;
+        }
+        [final-dot] {
+            opacity: 0;
+            /* transition: opacity 0.3s ease; */
+        }
+        
+        [final-dot].to-show {
+            opacity: 1;
+        }
+
+        @keyframes logoPulseBg {
+            0% {
+                transform: scale(1);
+                opacity: 0;
+            }
+
+            10% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            90% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 0;
+            }
+        }
+
+        @keyframes logoPulse {
+            0% {
+                transform: scale(1);
+            }
+
+            40% {
+                transform: scale(.95);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* Enhanced pulse animation for hero */
+        /* @keyframes heroPulse {
+            0%, 100% {
+                transform: scale(1);
+                filter: grayscale(0) brightness(1);
+            }
+            50% {
+                transform: scale(1.08);
+                filter: grayscale(0) brightness(1.1);
+            }
+        }
+
+        .svg-container .logo.to-pulse {
+            animation: heroPulse 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        } */

@@ -157,42 +157,152 @@ document.addEventListener("DOMContentLoaded", () => {
     checkRequiredInputs(getActiveTabIndex());
     trackDropdownChanges();
 
-    const dropdownTrigger = document.querySelector(".custom-dropdown_trigger");
-    const dropdownList = document.querySelector(".conditional-form_select-list.for-custom");
-    const tagsContainer = document.querySelector(".tags-holder_wrap");
+    // Handle multiple dropdown instances
+    const dropdownTriggers = document.querySelectorAll(".custom-dropdown_trigger");
+    
+    dropdownTriggers.forEach(dropdownTrigger => {
+      // Find the closest dropdown list to this trigger
+      // Strategy: check immediate parent, then siblings, then closest common wrapper
+      let dropdownList = dropdownTrigger.parentElement?.querySelector(".conditional-form_select-list.for-custom");
+      
+      if (!dropdownList) {
+        // Check next sibling
+        dropdownList = dropdownTrigger.nextElementSibling?.classList.contains("conditional-form_select-list") && 
+                      dropdownTrigger.nextElementSibling?.classList.contains("for-custom") 
+                      ? dropdownTrigger.nextElementSibling 
+                      : null;
+      }
+      
+      if (!dropdownList) {
+        // Look in closest wrapper and find the nearest one
+        const wrapper = dropdownTrigger.closest('[data-dropdown-group], .conditional-form_input-bl, .form-block, .section, .form-container');
+        if (wrapper) {
+          const allLists = Array.from(wrapper.querySelectorAll(".conditional-form_select-list.for-custom"));
+          // Find the list that's closest to this trigger in DOM tree
+          dropdownList = allLists.find(list => list.previousElementSibling === dropdownTrigger || 
+                                               list.parentElement?.contains(dropdownTrigger)) || allLists[0];
+        }
+      }
+      
+      // Find tags container closest to this trigger
+      let tagsContainer = null;
+      
+      // Check immediate parent first
+      tagsContainer = dropdownTrigger.parentElement?.querySelector(".tags-holder_wrap");
+      
+      if (!tagsContainer) {
+        // Check if dropdown list has it as sibling or child
+        if (dropdownList) {
+          tagsContainer = dropdownList.parentElement?.querySelector(".tags-holder_wrap");
+          
+          if (!tagsContainer) {
+            // Check siblings of dropdown list
+            let sibling = dropdownList.nextElementSibling;
+            while (sibling && !tagsContainer) {
+              if (sibling.classList.contains("tags-holder_wrap")) {
+                tagsContainer = sibling;
+              } else if (sibling.querySelector(".tags-holder_wrap")) {
+                tagsContainer = sibling.querySelector(".tags-holder_wrap");
+              }
+              sibling = sibling.nextElementSibling;
+            }
+          }
+        }
+      }
+      
+      if (!tagsContainer) {
+        // Fallback to closest wrapper
+        const wrapper = dropdownTrigger.closest('[data-dropdown-group], .conditional-form_input-bl, .form-block');
+        tagsContainer = wrapper?.querySelector(".tags-holder_wrap");
+      }
 
-    const toggleDropdown = () => dropdownList?.classList.toggle("visible");
+      if (!dropdownList) return;
 
-    const closeDropdown = (event) => {
-      const clickedInside = [dropdownTrigger, dropdownList, tagsContainer]
-      .filter(Boolean)
-      .some(el => el.contains(event.target));
+      // Toggle dropdown for this instance
+      const toggleDropdown = (e) => {
+        e.stopPropagation();
+        dropdownList.classList.toggle("visible");
+      };
 
-      if (!clickedInside) dropdownList?.classList.remove("visible");
-    };
+      // Close this specific dropdown when clicking outside
+      const closeDropdown = (event) => {
+        const clickedInside = [dropdownTrigger, dropdownList, tagsContainer]
+          .filter(Boolean)
+          .some(el => el.contains(event.target));
 
-    dropdownTrigger?.addEventListener("click", toggleDropdown);
-    document.addEventListener("click", closeDropdown);
-    document.addEventListener("keydown", e => e.key === "Escape" && dropdownList?.classList.remove("visible"));
-    tagsContainer?.addEventListener("click", e => e.stopPropagation());
+        if (!clickedInside && dropdownList.classList.contains("visible")) {
+          dropdownList.classList.remove("visible");
+        }
+      };
+
+      // Close on Escape key
+      const handleEscape = (e) => {
+        if (e.key === "Escape" && dropdownList.classList.contains("visible")) {
+          dropdownList.classList.remove("visible");
+        }
+      };
+
+      // Prevent closing when clicking tags container
+      const preventClose = (e) => e.stopPropagation();
+
+      // Add event listeners
+      dropdownTrigger.addEventListener("click", toggleDropdown);
+      document.addEventListener("click", closeDropdown);
+      document.addEventListener("keydown", handleEscape);
+      tagsContainer?.addEventListener("click", preventClose);
+    });
   });
 
   const checkboxTagManager = {
-    checkedValues: new Set(),
-    templateTag: null,
+    checkedValuesByContainer: new Map(),
 
     init() {
-      this.cacheTemplate();
+      this.cacheTemplates();
       this.bindCheckboxEvents();
-      this.initializeTagsContainer();
+      this.initializeTagsContainers();
     },
 
-    cacheTemplate() {
-      this.templateTag = document.querySelector(".tags-holder_item");
-      if (this.templateTag) {
-        Object.assign(this.templateTag.style, { display: "none" });
-        this.templateTag.classList.add("template");
+    cacheTemplates() {
+      document.querySelectorAll(".tags-holder_wrap").forEach(container => {
+        const templateTag = container.querySelector(".tags-holder_item");
+        if (templateTag) {
+          Object.assign(templateTag.style, { display: "none" });
+          templateTag.classList.add("template");
+        }
+      });
+    },
+
+    getTagsContainer(checkbox) {
+      // Strategy: Find tags container closest to this checkbox
+      // 1. Check if checkbox is inside a dropdown list
+      const dropdownList = checkbox.closest('.conditional-form_select-list');
+      
+      if (dropdownList) {
+        // Find the trigger associated with this dropdown
+        const wrapper = dropdownList.closest('[data-dropdown-group], .conditional-form_input-bl, .form-block');
+        if (wrapper) {
+          // Find tags container within the same wrapper
+          return wrapper.querySelector(".tags-holder_wrap");
+        }
+        
+        // Look for tags container near the dropdown list (sibling or nearby)
+        let tagsContainer = dropdownList.parentElement?.querySelector(".tags-holder_wrap");
+        if (tagsContainer) return tagsContainer;
+        
+        // Check siblings
+        let sibling = dropdownList.nextElementSibling;
+        while (sibling) {
+          if (sibling.classList.contains("tags-holder_wrap") || sibling.querySelector(".tags-holder_wrap")) {
+            return sibling.classList.contains("tags-holder_wrap") ? sibling : sibling.querySelector(".tags-holder_wrap");
+          }
+          sibling = sibling.nextElementSibling;
+        }
       }
+      
+      // Fallback: look for custom data attribute or closest parent
+      return checkbox.closest('[data-tags-group]')?.querySelector(".tags-holder_wrap") ||
+             checkbox.closest('.conditional-form_input-bl, .form-block')?.querySelector(".tags-holder_wrap") ||
+             checkbox.closest('.section, form, .form-container')?.querySelector(".tags-holder_wrap");
     },
 
     bindCheckboxEvents() {
@@ -203,12 +313,29 @@ document.addEventListener("DOMContentLoaded", () => {
     handleCheckboxChange(checkbox) {
       const { value } = checkbox;
       const text = this.getCheckboxText(checkbox);
+      const tagsContainer = this.getTagsContainer(checkbox);
+
+      if (!tagsContainer) return;
+
+      const containerId = tagsContainer.dataset.containerId || this.assignContainerId(tagsContainer);
+      
+      if (!this.checkedValuesByContainer.has(containerId)) {
+        this.checkedValuesByContainer.set(containerId, new Set());
+      }
+      
+      const checkedValues = this.checkedValuesByContainer.get(containerId);
 
       checkbox.checked ? 
-        (this.checkedValues.add(value), this.addTag(value, text)) : 
-      (this.checkedValues.delete(value), this.removeTag(value));
+        (checkedValues.add(value), this.addTag(value, text, tagsContainer)) : 
+        (checkedValues.delete(value), this.removeTag(value, tagsContainer));
 
-      this.updateTagsContainerVisibility();
+      this.updateTagsContainerVisibility(tagsContainer, containerId);
+    },
+
+    assignContainerId(container) {
+      const id = `container-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      container.dataset.containerId = id;
+      return id;
     },
 
     getCheckboxText(checkbox) {
@@ -221,14 +348,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return checkbox.value || "Selected item";
     },
 
-    addTag(value, text) {
-      const tagsContainer = document.querySelector(".tags-holder_wrap");
-
+    addTag(value, text, tagsContainer) {
       if (tagsContainer?.querySelector(`[data-value="${value}"]:not(.template)`)) return;
 
-      const tagElement = this.templateTag.cloneNode(true);
+      const templateTag = tagsContainer.querySelector(".tags-holder_item.template");
+      if (!templateTag) return;
 
-      // Fix: Set properties directly instead of using Object.assign with dataset
+      const tagElement = templateTag.cloneNode(true);
+
       tagElement.style.display = "";
       tagElement.dataset.value = value;
       tagElement.classList.remove("template");
@@ -241,52 +368,77 @@ document.addEventListener("DOMContentLoaded", () => {
       if (closeButton) {
         const newCloseButton = closeButton.cloneNode(true);
         closeButton.parentNode.replaceChild(newCloseButton, closeButton);
-        newCloseButton.addEventListener("click", () => this.removeTagAndUncheck(value));
+        newCloseButton.addEventListener("click", () => this.removeTagAndUncheck(value, tagsContainer));
       }
 
       tagsContainer?.appendChild(tagElement);
     },
 
-
-    removeTag(value) {
-      document.querySelector(`.tags-holder_item[data-value="${value}"]:not(.template)`)?.remove();
+    removeTag(value, tagsContainer) {
+      tagsContainer?.querySelector(`.tags-holder_item[data-value="${value}"]:not(.template)`)?.remove();
     },
 
-    removeTagAndUncheck(value) {
-      const checkbox = document.querySelector(`.conditional-form_checkbox[value="${value}"]`);
+    removeTagAndUncheck(value, tagsContainer) {
+      // Find the checkbox within the same dropdown context as the tags container
+      const wrapper = tagsContainer.closest('[data-dropdown-group], .conditional-form_input-bl, .form-block');
+      let checkbox = wrapper?.querySelector(`.conditional-form_checkbox[value="${value}"]`);
+      
+      if (!checkbox) {
+        // Fallback to broader search
+        const section = tagsContainer.closest('.section, form, .form-container');
+        checkbox = section?.querySelector(`.conditional-form_checkbox[value="${value}"]`);
+      }
+      
       if (checkbox) checkbox.checked = false;
 
-      this.checkedValues.delete(value);
-      this.removeTag(value);
-      this.updateTagsContainerVisibility();
+      const containerId = tagsContainer.dataset.containerId;
+      if (containerId && this.checkedValuesByContainer.has(containerId)) {
+        this.checkedValuesByContainer.get(containerId).delete(value);
+      }
+
+      this.removeTag(value, tagsContainer);
+      this.updateTagsContainerVisibility(tagsContainer, containerId);
     },
 
-    updateTagsContainerVisibility() {
-      const tagsContainer = document.querySelector(".tags-holder_wrap");
-      const tagsPlaceholder = document.querySelector("[retailers-placeholder]");
-      const hasValues = this.checkedValues.size > 0;
+    updateTagsContainerVisibility(tagsContainer, containerId) {
+      // Find placeholder closest to this tags container
+      const wrapper = tagsContainer.closest('[data-dropdown-group], .conditional-form_input-bl, .form-block');
+      const tagsPlaceholder = wrapper?.querySelector("[retailers-placeholder]") ||
+                              tagsContainer.parentElement?.querySelector("[retailers-placeholder]") ||
+                              tagsContainer.closest('.section, form')?.querySelector("[retailers-placeholder]");
+      
+      const checkedValues = this.checkedValuesByContainer.get(containerId);
+      const hasValues = checkedValues && checkedValues.size > 0;
 
       if (tagsContainer) tagsContainer.style.display = hasValues ? "flex" : "none";
       if (tagsPlaceholder) tagsPlaceholder.style.display = hasValues ? "none" : "flex";
     },
 
-    initializeTagsContainer() {
-      const tagsContainer = document.querySelector(".tags-holder_wrap");
-      if (tagsContainer) tagsContainer.style.display = "none";
+    initializeTagsContainers() {
+      document.querySelectorAll(".tags-holder_wrap").forEach(container => {
+        container.style.display = "none";
+      });
     },
 
-    getCheckedValues: () => Array.from(this.checkedValues),
+    getCheckedValues(containerId) {
+      return Array.from(this.checkedValuesByContainer.get(containerId) || []);
+    },
 
     clearAll() {
       document.querySelectorAll(".conditional-form_checkbox:checked")
         .forEach(checkbox => checkbox.checked = false);
 
-      this.checkedValues.clear();
+      this.checkedValuesByContainer.clear();
 
       document.querySelectorAll(".tags-holder_item:not(.template)")
         .forEach(tag => tag.remove());
 
-      this.updateTagsContainerVisibility();
+      document.querySelectorAll(".tags-holder_wrap").forEach(container => {
+        const containerId = container.dataset.containerId;
+        if (containerId) {
+          this.updateTagsContainerVisibility(container, containerId);
+        }
+      });
     }
   };
 
@@ -296,9 +448,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
   //MANAGEMENT OF GOAL INPUTS
-  const triggerElement = document.querySelector("[reset-goal-trigger]");
-  const conditionalDropdown = document.querySelector("[conditional-dropdown]");
-
   const VISIBILITY_RULES = {
     "Drive Awareness": [
       "Reach",
@@ -338,13 +487,19 @@ document.addEventListener("DOMContentLoaded", () => {
     ],
   };
 
-  if (triggerElement) {
+  // Handle multiple trigger/dropdown pairs
+  document.querySelectorAll("[reset-goal-trigger]").forEach(triggerElement => {
+    // Find the associated conditional dropdown for this trigger
+    const parentContainer = triggerElement.closest('.section, .form-container, [data-goal-group]');
+    const conditionalDropdown = parentContainer?.querySelector("[conditional-dropdown]") ||
+                                triggerElement.parentElement?.querySelector("[conditional-dropdown]");
+
+    if (!conditionalDropdown) return;
+
     const getTriggerValue = () =>
-    triggerElement.value || triggerElement.textContent || triggerElement.innerText;
+      triggerElement.value || triggerElement.textContent || triggerElement.innerText;
 
     const toggleDropdownState = (disable) => {
-      if (!conditionalDropdown) return;
-
       Object.assign(conditionalDropdown.style, {
         pointerEvents: disable ? "none" : "",
         opacity: disable ? "0.5" : ""
@@ -364,32 +519,32 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const forceCloseDropdown = () => {
-      conditionalDropdown?.classList.remove("w--open");
-      conditionalDropdown?.querySelectorAll(".w--open")
+      conditionalDropdown.classList.remove("w--open");
+      conditionalDropdown.querySelectorAll(".w--open")
         .forEach(el => el.classList.remove("w--open"));
-      conditionalDropdown?.querySelector(".w-dropdown-list")?.classList.remove("w--open");
+      conditionalDropdown.querySelector(".w-dropdown-list")?.classList.remove("w--open");
     };
 
     const filterDropdownItems = (triggerValue) => {
       const allowedItems = VISIBILITY_RULES[triggerValue] || [];
-      conditionalDropdown?.querySelectorAll("a.conditional-form_custom-select.w-dropdown-link")
+      conditionalDropdown.querySelectorAll("a.conditional-form_custom-select.w-dropdown-link")
         .forEach(item => {
-        item.style.display = allowedItems.includes(item.textContent.trim()) ? "" : "none";
-      });
+          item.style.display = allowedItems.includes(item.textContent.trim()) ? "" : "none";
+        });
     };
 
     const showAllDropdownItems = () =>
-    conditionalDropdown?.querySelectorAll("a.conditional-form_custom-select.w-dropdown-link")
-    .forEach(item => item.style.display = "");
+      conditionalDropdown.querySelectorAll("a.conditional-form_custom-select.w-dropdown-link")
+        .forEach(item => item.style.display = "");
 
     const resetDropdownValues = () => {
-      conditionalDropdown?.querySelectorAll("select, input, button")
+      conditionalDropdown.querySelectorAll("select, input, button")
         .forEach(element => {
-        if (element.tagName === "SELECT") element.selectedIndex = 0;
-        else if (["checkbox", "radio"].includes(element.type)) element.checked = false;
-        else element.value = "";
-        element.dispatchEvent(new Event("change", { bubbles: true }));
-      });
+          if (element.tagName === "SELECT") element.selectedIndex = 0;
+          else if (["checkbox", "radio"].includes(element.type)) element.checked = false;
+          else element.value = "";
+          element.dispatchEvent(new Event("change", { bubbles: true }));
+        });
     };
 
     const handleTriggerChange = () => {
@@ -400,7 +555,8 @@ document.addEventListener("DOMContentLoaded", () => {
         resetDropdownValues();
         setTimeout(() => toggleDropdownState(true), 100);
       } else {
-        document.querySelectorAll("[reset-goal-target]").forEach(btn => btn.click());
+        // Only reset targets within this container
+        parentContainer?.querySelectorAll("[reset-goal-target]").forEach(btn => btn.click());
         setTimeout(() => {
           toggleDropdownState(false);
           setTimeout(() => filterDropdownItems(getTriggerValue()), 50);
@@ -427,17 +583,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (["INPUT", "TEXTAREA", "SELECT"].includes(triggerElement.tagName)) {
         ["input", "change", "keyup", "paste", "cut"].forEach(event =>
-                                                             triggerElement.addEventListener(event, handleTriggerChange)
-                                                            );
+          triggerElement.addEventListener(event, handleTriggerChange)
+        );
       }
 
-      conditionalDropdown?.addEventListener("click", handleDropdownClick, true);
+      conditionalDropdown.addEventListener("click", handleDropdownClick, true);
 
       setTimeout(handleTriggerChange, 100);
     };
 
     initialize();
-  }
+  });
 
 
   //CLOSE FORM MANAGEMENT
@@ -522,6 +678,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  const forModHideSuccessMessage = section => {
+    const formWrapper = section.querySelector('.w-form');
+    if (!formWrapper) return;
+
+    const form = formWrapper.querySelector('form');
+    const successMessage = formWrapper.querySelector('.w-form-done');
+    
+    // Reset the form using Webflow's native reset (important for Webflow's internal state)
+    if (form) {
+      form.reset();
+      form.style.display = 'block';
+    }
+    
+    // Hide the success message
+    if (successMessage) {
+      successMessage.style.display = 'none';
+    }
+  };
+
   const forModClickFirstTabLink = element => {
     const tablist = element.closest('[role="tablist"]') || document.querySelector('[role="tablist"]');
     tablist?.querySelector('a, [role="tab"]')?.click();
@@ -591,10 +766,16 @@ document.addEventListener("DOMContentLoaded", () => {
           const section = trigger.closest(forModConfig.selectors.section);
           if (!section) return;
 
-          // ✅ Skip confirmation if success message is visible
+          // ✅ Skip confirmation if success message is visible, but reset form
           const successVisible = section.querySelector('.w-form-done')?.style.display === 'block';
           if (successVisible) {
+            forModHideSuccessMessage(section);
+            forModResetFormInputs(section);
+            forModClearFileUploads(section);
+            checkboxTagManager.clearAll();
+            forModResetTabNavigation();
             forModAnimateClose(section);
+            setTimeout(() => forModClickFirstTabLink(section), 200);
             return;
           }
 
@@ -635,7 +816,11 @@ document.addEventListener("DOMContentLoaded", () => {
         action: button => {
           const section = button.closest(forModConfig.selectors.section) || 
                 document.querySelector(forModConfig.selectors.section);
-          section && forModAnimateOpen(section);
+          if (section) {
+            // Ensure form is visible and success message is hidden when opening
+            forModHideSuccessMessage(section);
+            forModAnimateOpen(section);
+          }
         }
       }
     ];

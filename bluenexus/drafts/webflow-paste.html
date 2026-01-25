@@ -1,0 +1,65 @@
+<!-- Paste this entire code block into Webflow's Embed element -->
+<!-- Make sure to upload hero-canvas.html to your Webflow assets and update the path below -->
+
+<div id="bn-canvas-wrapper" style="width:100%;height:100vh;min-height:600px;position:relative;overflow:hidden;background:transparent;">
+  <div id="bn-svg-container" style="width:100%;height:100%;display:flex;justify-content:center;align-items:center;padding:2rem;"></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const wrapper = document.getElementById('bn-canvas-wrapper');
+  const container = document.getElementById('bn-svg-container');
+  if(!wrapper || !container) return;
+  
+  // Load hero-canvas.html content
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', 'https://code.anton-atom.com/Excited/bluenexus/hero-canvas.html', true);
+  xhr.onreadystatechange = function(){
+    if(xhr.readyState === 4 && xhr.status === 200){
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xhr.responseText, 'text/html');
+      const heroBody = doc.body;
+      
+      // Extract and inject styles
+      const styles = doc.querySelectorAll('style');
+      styles.forEach(s=>{
+        const style = document.createElement('style');
+        style.textContent = s.textContent;
+        // Scope styles to our container
+        style.textContent = style.textContent.replace(/(\.hero-canvas-wrapper|\.svg-container|body)/g, '#bn-canvas-wrapper $1, #bn-canvas-wrapper');
+        document.head.appendChild(style);
+      });
+      
+      // Extract SVG
+      const svg = heroBody.querySelector('svg');
+      if(svg) container.appendChild(svg);
+      
+      // Load external scripts
+      const scriptSrcs = Array.from(doc.querySelectorAll('script[src]')).map(s=>s.src);
+      let loaded = 0;
+      scriptSrcs.forEach(src=>{
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = ()=>{
+          loaded++;
+          if(loaded === scriptSrcs.length) initScripts(doc);
+        };
+        document.head.appendChild(script);
+      });
+      
+      if(scriptSrcs.length === 0) initScripts(doc);
+      
+      function initScripts(doc){
+        const inlineScripts = doc.querySelectorAll('script:not([src])');
+        inlineScripts.forEach(s=>{
+          const script = document.createElement('script');
+          script.textContent = s.textContent;
+          document.body.appendChild(script);
+        });
+      }
+    }
+  };
+  xhr.send();
+})();
+</script>

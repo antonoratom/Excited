@@ -1,0 +1,30 @@
+<!-- MINIMAL WEBFLOW EMBED - Just paste this into Webflow's Embed element -->
+<!-- Update the path to point to your hosted hero-canvas.html file -->
+
+<div id="bn-hero" style="width:100%;height:100vh;min-height:600px;"></div>
+<script>
+(function(d,t){
+  const el=d.getElementById('bn-hero');
+  if(!el) return;
+  const xhr=new XMLHttpRequest();
+  xhr.open('GET','./hero-canvas.html',true);
+  xhr.onload=function(){
+    if(xhr.status===200){
+      const p=new DOMParser();
+      const doc=p.parseFromString(xhr.responseText,'text/html');
+      el.innerHTML=doc.body.innerHTML;
+      doc.querySelectorAll('script[src]').forEach(s=>{
+        const sc=d.createElement('script');
+        sc.src=s.src;
+        d.head.appendChild(sc);
+      });
+      doc.querySelectorAll('script:not([src])').forEach(s=>{
+        const sc=d.createElement('script');
+        sc.textContent=s.textContent;
+        d.body.appendChild(sc);
+      });
+    }
+  };
+  xhr.send();
+})(document);
+</script>

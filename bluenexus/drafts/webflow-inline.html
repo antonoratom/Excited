@@ -1,0 +1,33 @@
+<div id="bluenexus-canvas" style="width:100%;height:100vh;min-height:600px;position:relative;overflow:hidden;"></div>
+<script>
+(function(){
+  const container = document.getElementById('bluenexus-canvas');
+  if(!container) return;
+  
+  fetch('./hero-canvas.html')
+    .then(r=>r.text())
+    .then(html=>{
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const body = doc.body;
+      container.innerHTML = body.innerHTML;
+      
+      // Load scripts
+      const scripts = doc.querySelectorAll('script[src]');
+      scripts.forEach(s=>{
+        const script = document.createElement('script');
+        script.src = s.src;
+        document.head.appendChild(script);
+      });
+      
+      // Execute inline scripts
+      const inlineScripts = doc.querySelectorAll('script:not([src])');
+      inlineScripts.forEach(s=>{
+        const script = document.createElement('script');
+        script.textContent = s.textContent;
+        document.body.appendChild(script);
+      });
+    })
+    .catch(e=>console.error('Failed to load canvas:',e));
+})();
+</script>
