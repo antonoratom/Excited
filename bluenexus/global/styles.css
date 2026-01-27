@@ -10,7 +10,7 @@
             width: 100%;
             height: 100%;
             background: transparent;
-            overflow: hidden;
+            /* overflow: hidden; */
         }
 
         [path-follow] {
@@ -25,7 +25,15 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
+            overflow: visible;
+        }
+        .one-integration-wrapper {
+            aspect-ratio: 2.87;
+            width: 100%;
+            overflow: visible;
+            padding: 1rem;
+        }
+        .one-integration-wrapper .svg-container {
         }
 
         .svg-container {
@@ -46,7 +54,7 @@
             max-width: 1400px;
             max-height: 100%;
             object-fit: contain;
-            filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.08));
+            /* filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.08)); */
             shape-rendering: geometricPrecision;
             text-rendering: geometricPrecision;
         }
