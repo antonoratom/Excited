@@ -155,20 +155,43 @@ class DotAnimationController {
         const path = this._findNextPath(logo);
         
         if (!dot || !path) return null;
-
+    
         // 🚫 PREVENT interruption: If this logo's dot is already animating, skip
         if (this.animatingLogos.has(logo)) {
             console.log(`⏭ Skipping ${logo.id} - dot already animating`);
             return null;
         }
-
+    
         // Mark this logo as animating
         this.animatingLogos.add(logo);
         logo.setAttribute('dot-animating', 'true'); // Visual indicator
-
+    
+        // ✨ NEW: Check if parent is .svg-container.for-hrt
+        const svgContainer = logo.closest('.svg-container');
+        const isHrtContainer = svgContainer && svgContainer.classList.contains('for-hrt');
+    
         // Decide if this dot should be gray
         if (this.randomDotsEnabled) {
-            const shouldBeGray = Math.random() < this.GRAY_PROBABILITY;
+            let shouldBeGray;
+    
+            if (isHrtContainer) {
+                // 🎯 SPECIAL LOGIC for .for-hrt container
+                if (logo.classList.contains('with-color') && logo.classList.contains('for-gray')) {
+                    // Force gray for .logo.with-color.for-gray
+                    shouldBeGray = true;
+                    console.log(`🔒 ${logo.id} forced GRAY (for-hrt + with-color + for-gray)`);
+                } else if (logo.classList.contains('with-color')) {
+                    // Force blue (not gray) for .logo.with-color
+                    shouldBeGray = false;
+                    console.log(`🔒 ${logo.id} forced BLUE (for-hrt + with-color)`);
+                } else {
+                    // Default random behavior for other logos in for-hrt container
+                    shouldBeGray = Math.random() < this.GRAY_PROBABILITY;
+                }
+            } else {
+                // 🎲 ORIGINAL LOGIC for other containers
+                shouldBeGray = Math.random() < this.GRAY_PROBABILITY;
+            }
             
             if (shouldBeGray) {
                 this.grayDots.add(dot);
@@ -177,12 +200,13 @@ class DotAnimationController {
                 this.grayDots.delete(dot);
             }
         }
-
+    
         const animation = this._createAnimation(logo, dot, path, options);
         this.activeAnimations.set(dot, animation);
         
         return animation;
     }
+    
 
     _findNextPath(element) {
         let sibling = element.nextElementSibling;
@@ -313,6 +337,10 @@ class DotAnimationController {
             return;
         }
         
+        // ✨ Check if container is .for-hrt
+        const svgContainer = finalDot.closest('.svg-container');
+        const isHrtContainer = svgContainer && svgContainer.classList.contains('for-hrt');
+        
         console.log('🎬 Starting circle animation sequence...');
         
         // Store original positions BEFORE any animation
@@ -390,17 +418,54 @@ class DotAnimationController {
                 finalDot.classList.remove('to-show');
                 gsap.set(finalDot, { x: 0, y: 0 });
                 
-                // Resume pulse
-                console.log('▶️ Resuming pulse system...');
-                if (this.pulseController) {
-                    this.pulseController.resume();
+                // 🎯 NEW: Special behavior for .for-hrt container
+                if (isHrtContainer) {
+                    console.log('🎯 for-hrt detected: Starting results display...');
+                    
+                    const resultsBlocks = document.querySelectorAll('[results-bl]');
+                    const finalRectangles = document.querySelectorAll('[final-rectangles]');
+                    
+                    if (resultsBlocks.length > 0 && finalRectangles.length > 0) {
+                        // Show results, hide rectangles (ALL instances)
+                        resultsBlocks.forEach(el => el.classList.add('to-show'));
+                        finalRectangles.forEach(el => el.classList.add('to-hide'));
+                        
+                        console.log(`📊 Results shown (${resultsBlocks.length} elements) for 5 seconds...`);
+                        
+                        // After 5 seconds: hide results, show rectangles, restart
+                        setTimeout(() => {
+                            resultsBlocks.forEach(el => el.classList.remove('to-show'));
+                            finalRectangles.forEach(el => el.classList.remove('to-hide'));
+                            
+                            console.log('🔄 Results hidden, restarting animation cycle...');
+                            
+                            // Resume pulse to restart the cycle
+                            if (this.pulseController) {
+                                this.pulseController.resume();
+                            }
+                        }, 5000);
+                    } else {
+                        console.warn('⚠ [results-bl] or [final-rectangles] not found');
+                        // Fallback: just resume
+                        if (this.pulseController) {
+                            this.pulseController.resume();
+                        }
+                    }
+                } else {
+                    // 🔄 ORIGINAL behavior for non-hrt containers
+                    console.log('▶️ Resuming pulse system...');
+                    if (this.pulseController) {
+                        this.pulseController.resume();
+                    }
                 }
                 
                 // Reset flag for next round
                 delete tl.circlesReset;
             }
+            
         });
     }
+    
     
     _resetAllCircles(circles, originalPositions) {
         console.log('🔄 Resetting all circles...');

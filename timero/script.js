@@ -1,3 +1,4 @@
+
 (() => {
   // Cache DOM elements
   const slider = document.getElementById('userSlider');

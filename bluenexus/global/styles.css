@@ -33,9 +33,7 @@
             overflow: visible;
             padding: 1rem;
         }
-        .one-integration-wrapper .svg-container {
-        }
-
+        
         .svg-container {
             width: 100%;
             height: 100%;
@@ -179,18 +177,28 @@
             }
         }
 
-        /* Enhanced pulse animation for hero */
-        /* @keyframes heroPulse {
-            0%, 100% {
-                transform: scale(1);
-                filter: grayscale(0) brightness(1);
+        .svg-container.no-pulse {
+            .logo {
+                animation: none;
             }
-            50% {
-                transform: scale(1.08);
-                filter: grayscale(0) brightness(1.1);
+            [logo-pulse] {
+                animation: none;
+                display: none;
             }
         }
 
-        .svg-container .logo.to-pulse {
-            animation: heroPulse 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-        } */
+        /* FOR HRT */
+        [results-bl]{
+            opacity: 0;
+            transition: opacity 0.6s ease-in-out;
+        }
+        [results-bl].to-show {
+            opacity: 1;
+        }
+        [final-rectangles]{
+            opacity: 1;
+            transition: opacity 0.6s ease-in-out;
+        }
+        [final-rectangles].to-hide {
+            opacity: 0;
+        }
