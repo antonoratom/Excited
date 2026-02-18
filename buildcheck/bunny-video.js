@@ -68,41 +68,6 @@ function initMiniShowreelPlayer() {
     if (pw) pw.style.zIndex = pwZ;
   }
 
-  function playFor(name) {
-    const wrap = getPW(name);
-    if (!wrap) return;
-
-    const bunny = wrap.querySelector("[data-bunny-player-init]");
-    const video = wrap.querySelector("video");
-    if (!video) return;
-
-    if (bunny) {
-      const btn = bunny.querySelector('[data-player-control="play"], [data-player-control="playpause"]');
-      if (btn && (video.paused || video.ended)) btn.click();
-      return;
-    }
-
-    try { video.play(); } catch(_) {}
-  }
-
-  function stopFor(name) {
-    const wrap = getPW(name);
-    if (!wrap) return;
-
-    const bunny = wrap.querySelector("[data-bunny-player-init]");
-    const video = wrap.querySelector("video");
-    if (!video) return;
-
-    if (bunny) {
-      const btn = bunny.querySelector('[data-player-control="pause"], [data-player-control="playpause"]');
-      if (btn && (!video.paused && !video.ended)) btn.click();
-    } else {
-      try { video.pause(); } catch(_) {}
-    }
-
-    try { video.currentTime = 0; } catch(_) {}
-  }
-
   function openBy(name) {
     if (!name || isOpen) return;
 
@@ -121,7 +86,6 @@ function initMiniShowreelPlayer() {
 
     zOn();
     setStatus("active");
-    playFor(n);
 
     const state = Flip.getState(pw);
     place(pw, rectFor(tg));
@@ -138,7 +102,6 @@ function initMiniShowreelPlayer() {
     if (!isOpen || !pw) return;
     if (nameOrEmpty && nameOrEmpty !== n) return;
 
-    stopFor(n);
     setStatus("not-active");
 
     const state = Flip.getState(pw);
@@ -190,22 +153,27 @@ function initMiniShowreelPlayer() {
   window.addEventListener("resize", onResize);
 }
 
-// Initialize Mini Showreel Player (with Advanced Player Support)
+// Initialize Mini Showreel Player
 document.addEventListener("DOMContentLoaded", function () {
   initMiniShowreelPlayer();
 });
 
 // Initialize Full Width Video Player
 function initBunnyPlayer() {
-  document.querySelectorAll('[data-bunny-player-init]').forEach(function(player) {
+  document.querySelectorAll('[data-bunny-player-init]').forEach(function (player) {
     var src = player.getAttribute('data-player-src');
     if (!src) return;
 
     var video = player.querySelector('video');
     if (!video) return;
 
-    try { video.pause(); } catch(_) {}
-    try { video.removeAttribute('src'); video.load(); } catch(_) {}
+    try { video.pause(); } catch (_) { }
+    try {
+      video.removeAttribute('src');
+      var sources = video.querySelectorAll('source');
+      sources.forEach(function (s) { s.parentNode.removeChild(s); });
+      video.load();
+    } catch (_) { }
 
     // Attribute helpers
     function setStatus(s) {
@@ -230,17 +198,15 @@ function initBunnyPlayer() {
     var timeProgressEls = player.querySelectorAll('[data-player-time-progress]');
 
     // Flags
-    var updateSize = player.getAttribute('data-player-update-size'); // "true" | "cover" | null
-    var lazyMode = player.getAttribute('data-player-lazy');          // "true" | "meta" | null
+    var updateSize = player.getAttribute('data-player-update-size');
+    var lazyMode = player.getAttribute('data-player-lazy');
     var isLazyTrue = lazyMode === 'true';
     var isLazyMeta = lazyMode === 'meta';
     var autoplay = player.getAttribute('data-player-autoplay') === 'true';
     var initialMuted = player.getAttribute('data-player-muted') === 'true';
 
-    // Used to suppress 'ready' flicker when user just pressed play in lazy modes
     var pendingPlay = false;
 
-    // Autoplay forces muted; IO will trigger "fake click"
     if (autoplay) { setMutedState(true); video.loop = true; } else { setMutedState(initialMuted); }
 
     video.setAttribute('muted', '');
@@ -250,6 +216,8 @@ function initBunnyPlayer() {
     if (typeof video.disableRemotePlayback !== 'undefined') video.disableRemotePlayback = true;
     if (autoplay) video.autoplay = false;
 
+    // NOTE: These are evaluated at init time but re-checked inside attachMediaOnce()
+    // so that late-loading HLS.js is still picked up.
     var isSafariNative = !!video.canPlayType('application/vnd.apple.mpegurl');
     var canUseHlsJs = !!(window.Hls && Hls.isSupported()) && !isSafariNative;
 
@@ -260,7 +228,7 @@ function initBunnyPlayer() {
       } else {
         var prev = video.preload;
         video.preload = 'metadata';
-        var onMeta2 = function() {
+        var onMeta2 = function () {
           setBeforeRatio(player, updateSize, video.videoWidth, video.videoHeight);
           video.removeEventListener('loadedmetadata', onMeta2);
           video.preload = prev || '';
@@ -270,9 +238,9 @@ function initBunnyPlayer() {
       }
     }
 
-    //  Lazy meta fetch (duration + aspect) without attaching playback
+    // Lazy meta fetch (duration + aspect) without attaching playback
     function fetchMetaOnce() {
-      getSourceMeta(src, canUseHlsJs).then(function(meta){
+      getSourceMeta(src, canUseHlsJs).then(function (meta) {
         if (meta.width && meta.height) setBeforeRatio(player, updateSize, meta.width, meta.height);
         if (timeDurationEls.length && isFinite(meta.duration) && meta.duration > 0) {
           setText(timeDurationEls, formatTime(meta.duration));
@@ -285,42 +253,128 @@ function initBunnyPlayer() {
     var isAttached = false;
     var userInteracted = false;
     var lastPauseBy = '';
+    var isDirectVideo = /\.(mp4|webm|mov|ogg|ogv)($|\?|#)/.test(src);
+    var mediaErrorRetries = 0;
+    var forceHlsJs = false;
+
     function attachMediaOnce() {
       if (isAttached) return;
       isAttached = true;
 
-      if (player._hls) { try { player._hls.destroy(); } catch(_) {} player._hls = null; }
+      if (player._hls) { try { player._hls.destroy(); } catch (_) { } player._hls = null; }
 
-      if (isSafariNative) {
-        video.preload = (isLazyTrue || isLazyMeta) ? 'auto' : video.preload;
+      var safariNative = !!video.canPlayType('application/vnd.apple.mpegurl');
+      var hlsJs = !!(window.Hls && Hls.isSupported());
+
+      // Only bypass HLS.js for sources that are clearly direct video
+      // files (.mp4, .webm, etc.). Everything else (including HLS URLs
+      // that may not end in .m3u8) goes through HLS.js or Safari native.
+      if (isDirectVideo) {
+        video.preload = (isLazyTrue || isLazyMeta) ? 'auto' : (video.preload || 'metadata');
         video.src = src;
-        video.addEventListener('loadedmetadata', function() {
-          readyIfIdle(player, pendingPlay);
+        video.addEventListener('loadedmetadata', function () {
+          if (pendingPlay) { safePlay(video); } else { readyIfIdle(player, pendingPlay); }
           if (updateSize === 'true') setBeforeRatio(player, updateSize, video.videoWidth, video.videoHeight);
           if (timeDurationEls.length) setText(timeDurationEls, formatTime(video.duration));
         }, { once: true });
-      } else if (canUseHlsJs) {
+        return;
+      }
+
+      if (safariNative && !forceHlsJs) {
+        video.preload = (isLazyTrue || isLazyMeta) ? 'auto' : video.preload;
+        video.src = src;
+        video.load();
+        setTimeout(function () {
+          if (video.readyState === 0 && !player._hls && window.Hls && Hls.isSupported()) {
+            forceHlsJs = true;
+            isAttached = false;
+            attachMediaOnce();
+            if (pendingPlay) safePlay(video);
+          }
+        }, 1200);
+        video.addEventListener('loadedmetadata', function () {
+          if (pendingPlay) { safePlay(video); } else { readyIfIdle(player, pendingPlay); }
+          if (updateSize === 'true') setBeforeRatio(player, updateSize, video.videoWidth, video.videoHeight);
+          if (timeDurationEls.length) setText(timeDurationEls, formatTime(video.duration));
+        }, { once: true });
+      } else if (hlsJs) {
+        mediaErrorRetries = 0;
         var hls = new Hls({ maxBufferLength: 10 });
         hls.attachMedia(video);
-        hls.on(Hls.Events.MEDIA_ATTACHED, function() { hls.loadSource(src); });
-        hls.on(Hls.Events.MANIFEST_PARSED, function() {
-          readyIfIdle(player, pendingPlay);
+        hls.on(Hls.Events.MEDIA_ATTACHED, function () { hls.loadSource(src); });
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          if (pendingPlay) { safePlay(video); } else { readyIfIdle(player, pendingPlay); }
           if (updateSize === 'true') {
             var lvls = hls.levels || [];
             var best = bestLevel(lvls);
             if (best && best.width && best.height) setBeforeRatio(player, updateSize, best.width, best.height);
           }
         });
-        hls.on(Hls.Events.LEVEL_LOADED, function(e, data) {
+        hls.on(Hls.Events.LEVEL_LOADED, function (e, data) {
           if (data && data.details && isFinite(data.details.totalduration)) {
             if (timeDurationEls.length) setText(timeDurationEls, formatTime(data.details.totalduration));
           }
         });
+        hls.on(Hls.Events.ERROR, function (event, data) {
+          if (data.fatal) {
+            console.warn('[BunnyPlayer] HLS fatal error:', data.type, data.details);
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              hls.startLoad();
+            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+              mediaErrorRetries++;
+              if (mediaErrorRetries <= 1) {
+                hls.recoverMediaError();
+              } else if (mediaErrorRetries === 2) {
+                hls.swapAudioCodec();
+                hls.recoverMediaError();
+              } else {
+                // HLS.js can't recover (likely codec issue) — destroy and
+                // fall back to native <video> src. Some browsers handle
+                // codec negotiation better natively than via MSE.
+                console.warn('[BunnyPlayer] HLS.js recovery failed, falling back to native src');
+                hls.destroy();
+                player._hls = null;
+                video.src = src;
+                if (pendingPlay) safePlay(video);
+              }
+            } else {
+              hls.destroy();
+              player._hls = null;
+              pendingPlay = false;
+              setStatus('ready');
+            }
+          }
+        });
         player._hls = hls;
       } else {
-        video.src = src;
+        // No HLS.js and not Safari. Non-Safari browsers cannot play HLS
+        // natively, so DON'T set video.src (it causes "No decoders"
+        // errors). Instead poll until HLS.js finishes loading, then
+        // re-attach properly.
+        console.warn('[BunnyPlayer] HLS.js not available yet — waiting for it to load…');
+        var hlsPoll = setInterval(function () {
+          if (window.Hls && Hls.isSupported()) {
+            clearInterval(hlsPoll);
+            isAttached = false;
+            attachMediaOnce();
+            if (pendingPlay) safePlay(video);
+          }
+        }, 200);
+        setTimeout(function () {
+          clearInterval(hlsPoll);
+          if (!player._hls) console.warn('[BunnyPlayer] HLS.js never loaded — video cannot play');
+        }, 5000);
       }
     }
+
+    // Allow re-initialization (used by A/B test cleanup to refresh a
+    // player whose initial HLS.js attachment may have been blocked by
+    // resource limits or script-load timing).
+    player._reinitMedia = function () {
+      if (player._hls) { try { player._hls.destroy(); } catch (_) { } player._hls = null; }
+      isAttached = false;
+      attachMediaOnce();
+    };
 
     // Initialize based on lazy mode
     if (isLazyMeta) {
@@ -329,17 +383,41 @@ function initBunnyPlayer() {
     } else if (isLazyTrue) {
       video.preload = 'none';
     } else {
-      attachMediaOnce();
+      // Defer to next tick so Firefox's video element can settle after
+      // the src-removal + load() reset above. Attaching HLS.js
+      // synchronously after load() causes silent failures in Firefox.
+      setTimeout(function () { attachMediaOnce(); }, 0);
     }
 
     // Toggle play/pause
     function togglePlay() {
       userInteracted = true;
       if (video.paused || video.ended) {
-        if ((isLazyTrue || isLazyMeta) && !isAttached) attachMediaOnce();
+        var justAttached = false;
+
+        if ((isLazyTrue || isLazyMeta) && !isAttached) {
+          attachMediaOnce();
+          justAttached = true;
+        }
+
+        // If HLS.js was not available at init but is now, re-attach
+        var safariNow = !!video.canPlayType('application/vnd.apple.mpegurl');
+        if (!isDirectVideo && isAttached && !player._hls && !safariNow
+          && window.Hls && Hls.isSupported()
+          && video.readyState === 0) {
+          player._reinitMedia();
+          justAttached = true;
+        }
+
         pendingPlay = true;
         lastPauseBy = '';
         setStatus('loading');
+
+        // Always attempt play in the user-gesture call stack. If the
+        // source was just (re-)attached the call may fail in Firefox;
+        // the MANIFEST_PARSED / canplay callbacks will retry via
+        // pendingPlay, and safePlay's NotAllowedError fallback will
+        // handle the expired-gesture case.
         safePlay(video);
       } else {
         lastPauseBy = 'manual';
@@ -366,13 +444,13 @@ function initBunnyPlayer() {
       if (video.webkitDisplayingFullscreen && typeof video.webkitExitFullscreen === 'function') return video.webkitExitFullscreen();
     }
     function toggleFullscreen() { if (isFsActive() || video.webkitDisplayingFullscreen) exitFullscreen(); else enterFullscreen(); }
-    document.addEventListener('fullscreenchange', function() { setFsAttr(isFsActive()); });
-    document.addEventListener('webkitfullscreenchange', function() { setFsAttr(isFsActive()); });
-    video.addEventListener('webkitbeginfullscreen', function() { setFsAttr(true); });
-    video.addEventListener('webkitendfullscreen', function() { setFsAttr(false); });
+    document.addEventListener('fullscreenchange', function () { setFsAttr(isFsActive()); });
+    document.addEventListener('webkitfullscreenchange', function () { setFsAttr(isFsActive()); });
+    video.addEventListener('webkitbeginfullscreen', function () { setFsAttr(true); });
+    video.addEventListener('webkitendfullscreen', function () { setFsAttr(false); });
 
     // Controls (delegated)
-    player.addEventListener('click', function(e) {
+    player.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-player-control]');
       if (!btn || !player.contains(btn)) return;
       var type = btn.getAttribute('data-player-control');
@@ -387,9 +465,9 @@ function initBunnyPlayer() {
       if (timeProgressEls.length) setText(timeProgressEls, formatTime(video.currentTime));
     }
     video.addEventListener('timeupdate', updateTimeTexts);
-    video.addEventListener('loadedmetadata', function(){ updateTimeTexts(); maybeSetRatioFromVideo(player, updateSize, video); });
-    video.addEventListener('loadeddata', function(){ maybeSetRatioFromVideo(player, updateSize, video); });
-    video.addEventListener('playing', function(){ maybeSetRatioFromVideo(player, updateSize, video); });
+    video.addEventListener('loadedmetadata', function () { updateTimeTexts(); maybeSetRatioFromVideo(player, updateSize, video); });
+    video.addEventListener('loadeddata', function () { maybeSetRatioFromVideo(player, updateSize, video); });
+    video.addEventListener('playing', function () { maybeSetRatioFromVideo(player, updateSize, video); });
     video.addEventListener('durationchange', updateTimeTexts);
 
     // rAF visuals (progress + handle only)
@@ -417,25 +495,40 @@ function initBunnyPlayer() {
     video.addEventListener('durationchange', updateBufferedBar);
 
     // Media event wiring
-    video.addEventListener('play', function() { setActivated(true); cancelAnimationFrame(rafId); loop(); setStatus('playing'); });
-    video.addEventListener('playing', function() { pendingPlay = false; setStatus('playing'); });
-    video.addEventListener('pause', function() { pendingPlay = false; cancelAnimationFrame(rafId); updateProgressVisuals(); setStatus('paused'); });
-    video.addEventListener('waiting', function() { setStatus('loading'); });
-    video.addEventListener('canplay', function() { readyIfIdle(player, pendingPlay); });
-    video.addEventListener('ended', function() { 
-        pendingPlay = false; 
-        cancelAnimationFrame(rafId); 
-        video.currentTime = 0; // Reset to first frame
-        updateProgressVisuals(); 
-        updateTimeTexts(); // Update time displays
-        setStatus('ready'); // Set status to ready instead of paused
-        setActivated(false); 
-      });
-      
+    video.addEventListener('play', function () { setActivated(true); cancelAnimationFrame(rafId); loop(); setStatus('playing'); });
+    video.addEventListener('playing', function () { pendingPlay = false; setStatus('playing'); });
+    video.addEventListener('pause', function () { pendingPlay = false; cancelAnimationFrame(rafId); updateProgressVisuals(); setStatus('paused'); });
+    video.addEventListener('waiting', function () { setStatus('loading'); });
+    video.addEventListener('canplay', function () {
+      if (pendingPlay) { safePlay(video); } else { readyIfIdle(player, pendingPlay); }
+    });
+    video.addEventListener('error', function () {
+      // Ignore errors during initial reset (no source loaded yet)
+      if (!video.src && !video.currentSrc) return;
+      console.warn('[BunnyPlayer] video error:', video.error && video.error.code, video.error && video.error.message);
+      // If the native fallback failed (e.g. .m3u8 in Chrome) and HLS.js
+      // is now available, re-attempt with HLS.js before giving up.
+      if (!isDirectVideo && !player._hls && window.Hls && Hls.isSupported()) {
+        // Safari can report native HLS support while still failing to decode
+        // certain manifest URLs. In that case force HLS.js on retry.
+        forceHlsJs = true;
+        var wasPending = pendingPlay;
+        isAttached = false;
+        attachMediaOnce();
+        if (wasPending) { pendingPlay = true; setStatus('loading'); }
+        return;
+      }
+      pendingPlay = false;
+      cancelAnimationFrame(rafId);
+      setStatus('ready');
+      setActivated(false);
+    });
+    video.addEventListener('ended', function () { pendingPlay = false; cancelAnimationFrame(rafId); updateProgressVisuals(); setStatus('paused'); setActivated(false); });
+
     // Scrubbing (pointer events)
     if (timeline) {
       var dragging = false, wasPlaying = false, targetTime = 0, lastSeekTs = 0, seekThrottle = 180, rect = null;
-      window.addEventListener('resize', function() { if (!dragging) rect = null; });
+      window.addEventListener('resize', function () { if (!dragging) rect = null; });
       function getFractionFromX(x) {
         if (!rect) rect = timeline.getBoundingClientRect();
         var f = (x - rect.left) / rect.width; if (f < 0) f = 0; if (f > 1) f = 1; return f;
@@ -485,7 +578,7 @@ function initBunnyPlayer() {
         player.setAttribute('data-player-hover', state);
       }
     }
-    function scheduleHide() { clearTimeout(hoverTimer); hoverTimer = setTimeout(function() { setHover('idle'); }, hoverHideDelay); }
+    function scheduleHide() { clearTimeout(hoverTimer); hoverTimer = setTimeout(function () { setHover('idle'); }, hoverHideDelay); }
     function wakeControls() { setHover('active'); scheduleHide(); }
     player.addEventListener('pointerdown', wakeControls);
     document.addEventListener('fullscreenchange', wakeControls);
@@ -495,55 +588,73 @@ function initBunnyPlayer() {
       var r = player.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) wakeControls();
     }
-    player.addEventListener('pointerenter', function() {
+    player.addEventListener('pointerenter', function () {
       wakeControls();
       if (!trackingMove) { trackingMove = true; window.addEventListener('pointermove', onPointerMoveGlobal, { passive: true }); }
     });
-    player.addEventListener('pointerleave', function() {
+    player.addEventListener('pointerleave', function () {
       setHover('idle'); clearTimeout(hoverTimer);
       if (trackingMove) { trackingMove = false; window.removeEventListener('pointermove', onPointerMoveGlobal); }
     });
 
-    // In-view auto play/pause
-var io = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      var inView = entry.isIntersecting && entry.intersectionRatio > 0;
-  
-      if (inView) {
-        // Only auto-resume if autoplay is enabled
-        if (autoplay) {
-          if ((isLazyTrue || isLazyMeta) && !isAttached) attachMediaOnce();
-  
-          if (video.paused) {
-            lastPauseBy = '';
-            pendingPlay = true;
-            setStatus('loading');
-            safePlay(video);
+    // Mini-showreel integration: auto-play when the showreel opens
+    // (status="active") and auto-pause+reset when it closes
+    // (status="not-active"). Uses a MutationObserver so the bunny player
+    // stays decoupled from the showreel animation code.
+    var showreelWrap = player.closest('[data-mini-showreel-player]');
+    if (showreelWrap) {
+      var showreelObs = new MutationObserver(function (mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          if (mutations[i].attributeName !== 'data-mini-showreel-status') continue;
+          var status = showreelWrap.getAttribute('data-mini-showreel-status');
+          if (status === 'active') {
+            if (video.paused || video.ended) {
+              if ((isLazyTrue || isLazyMeta) && !isAttached) attachMediaOnce();
+              pendingPlay = true;
+              lastPauseBy = '';
+              setStatus('loading');
+              safePlay(video);
+            }
+          } else if (status === 'not-active') {
+            pendingPlay = false;
+            if (!video.paused && !video.ended) video.pause();
+            try { video.currentTime = 0; } catch (_) { }
+            setStatus('paused');
+          }
+        }
+      });
+      showreelObs.observe(showreelWrap, { attributes: true, attributeFilter: ['data-mini-showreel-status'] });
+    }
+
+    // In-view auto play/pause (only when autoplay is true)
+    if (autoplay) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          var inView = entry.isIntersecting && entry.intersectionRatio > 0;
+
+          if (inView) {
+            if ((isLazyTrue || isLazyMeta) && !isAttached) attachMediaOnce();
+
+            if (video.paused) {
+              lastPauseBy = '';
+              pendingPlay = true;
+              setStatus('loading');
+              safePlay(video);
+            } else {
+              setStatus('playing');
+            }
           } else {
-            setStatus('playing');
+            if (!video.paused && !video.ended) {
+              lastPauseBy = 'io';
+              video.pause();
+              setStatus('paused');
+            }
           }
-        } else {
-          // Non-autoplay: resume only if it was paused by IO, not manually
-          if (lastPauseBy === 'io' && video.paused) {
-            lastPauseBy = '';
-            pendingPlay = true;
-            setStatus('loading');
-            safePlay(video);
-          }
-        }
-      } else {
-        // Pause ANY playing video when out of view (autoplay or not)
-        if (!video.paused && !video.ended) {
-          lastPauseBy = 'io';
-          video.pause();
-          setStatus('paused');
-        }
-      }
-    });
-  }, { threshold: 0.1 });
-  
-  io.observe(player);
-  
+        });
+      }, { threshold: 0.1 });
+
+      io.observe(player);
+    }
   });
 
   // Helper: time/text/meta/ratio utilities
@@ -553,25 +664,37 @@ var io = new IntersectionObserver(function(entries) {
     var s = Math.floor(sec), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
     return h > 0 ? (h + ':' + pad2(m) + ':' + pad2(r)) : (pad2(m) + ':' + pad2(r));
   }
-  function setText(nodes, text) { nodes.forEach(function(n){ n.textContent = text; }); }
+  function setText(nodes, text) { nodes.forEach(function (n) { n.textContent = text; }); }
 
-  // Helper: Choose best HLS level by resolution --- */
+  // Helper: Choose best HLS level by resolution
   function bestLevel(levels) {
     if (!levels || !levels.length) return null;
-    return levels.reduce(function(a, b) { return ((b.width||0) > (a.width||0)) ? b : a; }, levels[0]);
+    return levels.reduce(function (a, b) { return ((b.width || 0) > (a.width || 0)) ? b : a; }, levels[0]);
   }
 
-  // Helper: Safe programmatic play
+  // Helper: Safe programmatic play — handles Firefox's strict autoplay
+  // policy by falling back to muted playback when the user-gesture window
+  // has expired (common when HLS.js attaches source asynchronously).
   function safePlay(video) {
     var p = video.play();
-    if (p && typeof p.then === 'function') p.catch(function(){});
+    if (p && typeof p.then === 'function') {
+      p.catch(function (err) {
+        if (err.name === 'NotAllowedError') {
+          video.muted = true;
+          var pl = video.closest('[data-bunny-player-init]');
+          if (pl) pl.setAttribute('data-player-muted', 'true');
+          var p2 = video.play();
+          if (p2 && typeof p2.then === 'function') p2.catch(function () { });
+        }
+      });
+    }
   }
 
   // Helper: Ready status guard
   function readyIfIdle(player, pendingPlay) {
     if (!pendingPlay &&
-        player.getAttribute('data-player-activated') !== 'true' &&
-        player.getAttribute('data-player-status') === 'idle') {
+      player.getAttribute('data-player-activated') !== 'true' &&
+      player.getAttribute('data-player-status') === 'idle') {
       player.setAttribute('data-player-status', 'ready');
     }
   }
@@ -594,32 +717,32 @@ var io = new IntersectionObserver(function(entries) {
   }
 
   // Helper: simple URL resolver
-  function resolveUrl(base, rel) { try { return new URL(rel, base).toString(); } catch(_) { return rel; } }
+  function resolveUrl(base, rel) { try { return new URL(rel, base).toString(); } catch (_) { return rel; } }
 
   // Helper: Unified meta fetch (hls.js or native fetch)
   function getSourceMeta(src, useHlsJs) {
-    return new Promise(function(resolve) {
+    return new Promise(function (resolve) {
       if (useHlsJs && window.Hls && Hls.isSupported()) {
         try {
           var tmp = new Hls();
           var out = { width: 0, height: 0, duration: NaN };
           var haveLvls = false, haveDur = false;
 
-          tmp.on(Hls.Events.MANIFEST_PARSED, function(e, data) {
+          tmp.on(Hls.Events.MANIFEST_PARSED, function (e, data) {
             var lvls = (data && data.levels) || tmp.levels || [];
             var best = bestLevel(lvls);
             if (best && best.width && best.height) { out.width = best.width; out.height = best.height; haveLvls = true; }
           });
-          tmp.on(Hls.Events.LEVEL_LOADED, function(e, data) {
+          tmp.on(Hls.Events.LEVEL_LOADED, function (e, data) {
             if (data && data.details && isFinite(data.details.totalduration)) { out.duration = data.details.totalduration; haveDur = true; }
           });
-          tmp.on(Hls.Events.ERROR, function(){ try { tmp.destroy(); } catch(_) {} resolve(out); });
-          tmp.on(Hls.Events.LEVEL_LOADED, function(){ try { tmp.destroy(); } catch(_) {} resolve(out); });
+          tmp.on(Hls.Events.ERROR, function () { try { tmp.destroy(); } catch (_) { } resolve(out); });
+          tmp.on(Hls.Events.LEVEL_LOADED, function () { try { tmp.destroy(); } catch (_) { } resolve(out); });
 
           tmp.loadSource(src);
           return;
-        } catch(_) {
-          resolve({ width:0, height:0, duration:NaN });
+        } catch (_) {
+          resolve({ width: 0, height: 0, duration: NaN });
           return;
         }
       }
@@ -627,7 +750,7 @@ var io = new IntersectionObserver(function(entries) {
       function parseMaster(masterText) {
         var lines = masterText.split(/\r?\n/);
         var bestW = 0, bestH = 0, firstMedia = null, lastInf = null;
-        for (var i=0;i<lines.length;i++) {
+        for (var i = 0; i < lines.length; i++) {
           var line = lines[i];
           if (line.indexOf('#EXT-X-STREAM-INF:') === 0) {
             lastInf = line;
@@ -635,7 +758,7 @@ var io = new IntersectionObserver(function(entries) {
             if (!firstMedia) firstMedia = line.trim();
             var m = /RESOLUTION=(\d+)x(\d+)/.exec(lastInf);
             if (m) {
-              var w = parseInt(m[1],10), h = parseInt(m[2],10);
+              var w = parseInt(m[1], 10), h = parseInt(m[2], 10);
               if (w > bestW) { bestW = w; bestH = h; }
             }
             lastInf = null;
@@ -649,25 +772,214 @@ var io = new IntersectionObserver(function(entries) {
         return dur;
       }
 
-      fetch(src, { credentials: 'omit', cache: 'no-store' }).then(function(r){
+      fetch(src, { credentials: 'omit', cache: 'no-store' }).then(function (r) {
         if (!r.ok) throw new Error('master');
         return r.text();
-      }).then(function(master){
+      }).then(function (master) {
         var info = parseMaster(master);
-        if (!info.media) { resolve({ width: info.bestW||0, height: info.bestH||0, duration: NaN }); return; }
+        if (!info.media) { resolve({ width: info.bestW || 0, height: info.bestH || 0, duration: NaN }); return; }
         var mediaUrl = resolveUrl(src, info.media);
-        return fetch(mediaUrl, { credentials: 'omit', cache: 'no-store' }).then(function(r){
+        return fetch(mediaUrl, { credentials: 'omit', cache: 'no-store' }).then(function (r) {
           if (!r.ok) throw new Error('media');
           return r.text();
-        }).then(function(mediaText){
-          resolve({ width: info.bestW||0, height: info.bestH||0, duration: sumDuration(mediaText) });
+        }).then(function (mediaText) {
+          resolve({ width: info.bestW || 0, height: info.bestH || 0, duration: sumDuration(mediaText) });
         });
-      }).catch(function(){ resolve({ width:0, height:0, duration:NaN }); });
+      }).catch(function () { resolve({ width: 0, height: 0, duration: NaN }); });
     });
   }
 }
 
 // Initialize Bunny HTML HLS Player (Advanced)
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   initBunnyPlayer();
 });
+
+
+(function () {
+  'use strict';
+
+  // Detect mobile devices
+  const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  // If mobile: show control only and exit immediately
+  if (isMobile) {
+    console.log('Mobile device detected - A/B test disabled, showing control only');
+
+    function showControlOnMobile() {
+      const controlVideo = document.getElementById('hero-video-control');
+      const videoB1 = document.getElementById('hero-video-b1');
+      const videoA2 = document.getElementById('hero-video-a2');
+
+      if (controlVideo) {
+        controlVideo.style.display = 'block';
+        controlVideo.style.visibility = 'visible';
+        controlVideo.style.opacity = '1';
+      }
+
+      if (videoB1) {
+        videoB1.style.display = 'none';
+        videoB1.style.visibility = 'hidden';
+        videoB1.style.opacity = '0';
+      }
+
+      if (videoA2) {
+        videoA2.style.display = 'none';
+        videoA2.style.visibility = 'hidden';
+        videoA2.style.opacity = '0';
+      }
+
+      console.log('Mobile: Control video shown, other variants hidden');
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', showControlOnMobile);
+    } else {
+      showControlOnMobile();
+    }
+
+    return;
+  }
+
+  // ===========================================
+  // DESKTOP ONLY CODE BELOW THIS LINE
+  // ===========================================
+
+  console.log('Desktop device detected - running A/B test');
+
+  const MAX_WAIT_TIME = 5000;
+  const CHECK_INTERVAL = 50;
+
+  // Destroy HLS instances and release video resources inside a container
+  // so hidden A/B variants don't hog MediaSource slots or bandwidth.
+  function teardownPlayers(container) {
+    if (!container) return;
+    container.querySelectorAll('[data-bunny-player-init]').forEach(function (p) {
+      if (p._hls) {
+        try { p._hls.destroy(); } catch (_) { }
+        p._hls = null;
+      }
+      var v = p.querySelector('video');
+      if (v) {
+        try { v.pause(); } catch (_) { }
+        try { v.removeAttribute('src'); v.load(); } catch (_) { }
+      }
+    });
+  }
+
+  // Ensure the player inside a container is ready to play. If the initial
+  // HLS.js attachment failed (e.g. script wasn't loaded yet, or browser
+  // hit a MediaSource limit), this gives it a fresh start.
+  function ensurePlayerReady(container) {
+    if (!container) return;
+    container.querySelectorAll('[data-bunny-player-init]').forEach(function (p) {
+      var v = p.querySelector('video');
+      if (v && v.readyState === 0 && p._reinitMedia) {
+        p._reinitMedia();
+      }
+    });
+  }
+
+  function runHeroVideoTest() {
+    posthog.onFeatureFlags(function () {
+      const heroVideoVariant = posthog.getFeatureFlag('Hero-Video');
+
+      const controlVideo = document.getElementById('hero-video-control');
+      const videoB1 = document.getElementById('hero-video-b1');
+      const videoA2 = document.getElementById('hero-video-a2');
+
+      if (!controlVideo || !videoB1 || !videoA2) {
+        console.warn('Hero video elements not found');
+        return;
+      }
+
+      var allContainers = [controlVideo, videoB1, videoA2];
+      var shownContainer = null;
+
+      // Hide all variants
+      allContainers.forEach(function (c) { c.style.display = 'none'; });
+
+      // Show the correct variant
+      switch (heroVideoVariant) {
+        case 'control':
+          shownContainer = controlVideo;
+          console.log('Showing control variant');
+          break;
+        case 'video-b1':
+          shownContainer = videoB1;
+          console.log('Showing video-b1 variant');
+          break;
+        case 'video-a2':
+          shownContainer = videoA2;
+          console.log('Showing video-a2 variant');
+          break;
+        case false:
+        case undefined:
+        case null:
+          console.log('Feature flag not active, showing control');
+          shownContainer = controlVideo;
+          break;
+        default:
+          console.log('Unknown variant:', heroVideoVariant, '- showing control');
+          shownContainer = controlVideo;
+      }
+
+      if (shownContainer) shownContainer.style.display = 'block';
+
+      // Tear down hidden variants to free MediaSource slots / bandwidth,
+      // then make sure the visible variant's player is functional.
+      allContainers.forEach(function (c) {
+        if (c !== shownContainer) teardownPlayers(c);
+      });
+      ensurePlayerReady(shownContainer);
+
+      console.log('Hero video variant loaded:', heroVideoVariant);
+    });
+  }
+
+  function waitForPostHog(callback) {
+    if (typeof window.posthog !== 'undefined' && window.posthog) {
+      console.log('PostHog found immediately');
+      callback();
+      return;
+    }
+
+    console.log('Waiting for PostHog to load from GTM...');
+
+    let elapsed = 0;
+    const interval = setInterval(function () {
+      elapsed += CHECK_INTERVAL;
+
+      if (typeof window.posthog !== 'undefined' && window.posthog) {
+        clearInterval(interval);
+        console.log('PostHog loaded after', elapsed, 'ms');
+        callback();
+        return;
+      }
+
+      if (elapsed >= MAX_WAIT_TIME) {
+        clearInterval(interval);
+        console.error('PostHog failed to load within', MAX_WAIT_TIME, 'ms');
+        const controlVideo = document.getElementById('hero-video-control');
+        if (controlVideo) {
+          controlVideo.style.display = 'block';
+
+          // Clean up the other two containers
+          var videoB1 = document.getElementById('hero-video-b1');
+          var videoA2 = document.getElementById('hero-video-a2');
+          teardownPlayers(videoB1);
+          teardownPlayers(videoA2);
+          ensurePlayerReady(controlVideo);
+        }
+      }
+    }, CHECK_INTERVAL);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      waitForPostHog(runHeroVideoTest);
+    });
+  } else {
+    waitForPostHog(runHeroVideoTest);
+  }
+})();
