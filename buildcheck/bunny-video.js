@@ -850,6 +850,29 @@ document.addEventListener('DOMContentLoaded', function () {
   const MAX_WAIT_TIME = 5000;
   const CHECK_INTERVAL = 50;
 
+  function getHeroVideoContainers() {
+    return {
+      controlVideo: document.getElementById('hero-video-control'),
+      videoB1: document.getElementById('hero-video-b1'),
+      videoA2: document.getElementById('hero-video-a2')
+    };
+  }
+
+  function showOnlyOneVariant(shownContainer) {
+    var refs = getHeroVideoContainers();
+    var allContainers = [refs.controlVideo, refs.videoB1, refs.videoA2].filter(Boolean);
+    if (!allContainers.length || !shownContainer) return;
+
+    allContainers.forEach(function (c) {
+      c.style.display = (c === shownContainer) ? 'block' : 'none';
+    });
+
+    allContainers.forEach(function (c) {
+      if (c !== shownContainer) teardownPlayers(c);
+    });
+    ensurePlayerReady(shownContainer);
+  }
+
   // Destroy HLS instances and release video resources inside a container
   // so hidden A/B variants don't hog MediaSource slots or bandwidth.
   function teardownPlayers(container) {
@@ -883,21 +906,17 @@ document.addEventListener('DOMContentLoaded', function () {
   function runHeroVideoTest() {
     posthog.onFeatureFlags(function () {
       const heroVideoVariant = posthog.getFeatureFlag('Hero-Video');
-
-      const controlVideo = document.getElementById('hero-video-control');
-      const videoB1 = document.getElementById('hero-video-b1');
-      const videoA2 = document.getElementById('hero-video-a2');
+      var refs = getHeroVideoContainers();
+      const controlVideo = refs.controlVideo;
+      const videoB1 = refs.videoB1;
+      const videoA2 = refs.videoA2;
 
       if (!controlVideo || !videoB1 || !videoA2) {
         console.warn('Hero video elements not found');
         return;
       }
 
-      var allContainers = [controlVideo, videoB1, videoA2];
       var shownContainer = null;
-
-      // Hide all variants
-      allContainers.forEach(function (c) { c.style.display = 'none'; });
 
       // Show the correct variant
       switch (heroVideoVariant) {
@@ -924,14 +943,7 @@ document.addEventListener('DOMContentLoaded', function () {
           shownContainer = controlVideo;
       }
 
-      if (shownContainer) shownContainer.style.display = 'block';
-
-      // Tear down hidden variants to free MediaSource slots / bandwidth,
-      // then make sure the visible variant's player is functional.
-      allContainers.forEach(function (c) {
-        if (c !== shownContainer) teardownPlayers(c);
-      });
-      ensurePlayerReady(shownContainer);
+      showOnlyOneVariant(shownContainer);
 
       console.log('Hero video variant loaded:', heroVideoVariant);
     });
@@ -960,26 +972,22 @@ document.addEventListener('DOMContentLoaded', function () {
       if (elapsed >= MAX_WAIT_TIME) {
         clearInterval(interval);
         console.error('PostHog failed to load within', MAX_WAIT_TIME, 'ms');
-        const controlVideo = document.getElementById('hero-video-control');
-        if (controlVideo) {
-          controlVideo.style.display = 'block';
-
-          // Clean up the other two containers
-          var videoB1 = document.getElementById('hero-video-b1');
-          var videoA2 = document.getElementById('hero-video-a2');
-          teardownPlayers(videoB1);
-          teardownPlayers(videoA2);
-          ensurePlayerReady(controlVideo);
-        }
+        var refs = getHeroVideoContainers();
+        if (refs.controlVideo) showOnlyOneVariant(refs.controlVideo);
       }
     }, CHECK_INTERVAL);
   }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
+      // Keep only one variant visible while PostHog is still loading.
+      var refs = getHeroVideoContainers();
+      if (refs.controlVideo) showOnlyOneVariant(refs.controlVideo);
       waitForPostHog(runHeroVideoTest);
     });
   } else {
+    var refs = getHeroVideoContainers();
+    if (refs.controlVideo) showOnlyOneVariant(refs.controlVideo);
     waitForPostHog(runHeroVideoTest);
   }
 })();
