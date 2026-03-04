@@ -1,10 +1,7 @@
 // Initialize Mini Showreel Player
-if (window.gsap && window.Flip) {
-  gsap.registerPlugin(Flip);
-}
+gsap.registerPlugin(Flip);
 
 function initMiniShowreelPlayer() {
-  if (!window.gsap || !window.Flip) return;
   const openBtns = document.querySelectorAll("[data-mini-showreel-open]");
   if (!openBtns.length) return;
 
@@ -370,8 +367,9 @@ function initBunnyPlayer() {
       }
     }
 
-    // Allow re-initialization if initial HLS.js attachment was blocked
-    // by resource limits or script-load timing.
+    // Allow re-initialization (used by A/B test cleanup to refresh a
+    // player whose initial HLS.js attachment may have been blocked by
+    // resource limits or script-load timing).
     player._reinitMedia = function () {
       if (player._hls) { try { player._hls.destroy(); } catch (_) { } player._hls = null; }
       isAttached = false;
@@ -789,7 +787,6 @@ function initBunnyPlayer() {
         });
       }).catch(function () { resolve({ width: 0, height: 0, duration: NaN }); });
     });
-    
   }
 }
 
@@ -801,30 +798,83 @@ document.addEventListener('DOMContentLoaded', function () {
 
 (function () {
   'use strict';
-  var isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-  function showContainer(container) {
-    if (!container) return;
-    container.style.setProperty('display', 'block', 'important');
-    container.style.setProperty('visibility', 'visible', 'important');
-    container.style.setProperty('opacity', '1', 'important');
-    container.style.setProperty('pointer-events', 'auto', 'important');
-    container.querySelectorAll('[data-bunny-player-init], video').forEach(function (el) {
-      el.style.setProperty('display', 'block', 'important');
-      el.style.setProperty('visibility', 'visible', 'important');
-      el.style.setProperty('opacity', '1', 'important');
+  // Detect mobile devices
+  const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  // If mobile: show control only and exit immediately
+  if (isMobile) {
+    console.log('Mobile device detected - A/B test disabled, showing control only');
+
+    function showControlOnMobile() {
+      const controlVideo = document.getElementById('hero-video-control');
+      const videoB1 = document.getElementById('hero-video-b1');
+      const videoA2 = document.getElementById('hero-video-a2');
+
+      if (controlVideo) {
+        controlVideo.style.display = 'block';
+        controlVideo.style.visibility = 'visible';
+        controlVideo.style.opacity = '1';
+      }
+
+      if (videoB1) {
+        videoB1.style.display = 'none';
+        videoB1.style.visibility = 'hidden';
+        videoB1.style.opacity = '0';
+      }
+
+      if (videoA2) {
+        videoA2.style.display = 'none';
+        videoA2.style.visibility = 'hidden';
+        videoA2.style.opacity = '0';
+      }
+
+      console.log('Mobile: Control video shown, other variants hidden');
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', showControlOnMobile);
+    } else {
+      showControlOnMobile();
+    }
+
+    return;
+  }
+
+  // ===========================================
+  // DESKTOP ONLY CODE BELOW THIS LINE
+  // ===========================================
+
+  console.log('Desktop device detected - running A/B test');
+
+  const MAX_WAIT_TIME = 5000;
+  const CHECK_INTERVAL = 50;
+
+  function getHeroVideoContainers() {
+    return {
+      controlVideo: document.getElementById('hero-video-control'),
+      videoB1: document.getElementById('hero-video-b1'),
+      videoA2: document.getElementById('hero-video-a2')
+    };
+  }
+
+  function showOnlyOneVariant(shownContainer) {
+    var refs = getHeroVideoContainers();
+    var allContainers = [refs.controlVideo, refs.videoB1, refs.videoA2].filter(Boolean);
+    if (!allContainers.length || !shownContainer) return;
+
+    allContainers.forEach(function (c) {
+      c.style.display = (c === shownContainer) ? 'block' : 'none';
     });
+
+    allContainers.forEach(function (c) {
+      if (c !== shownContainer) teardownPlayers(c);
+    });
+    ensurePlayerReady(shownContainer);
   }
 
-  function hideContainer(container) {
-    if (!container) return;
-    container.style.setProperty('display', 'none', 'important');
-    container.style.setProperty('visibility', 'hidden', 'important');
-    container.style.setProperty('opacity', '0', 'important');
-    container.style.setProperty('pointer-events', 'none', 'important');
-  }
-
-  // Destroy HLS instances and release video resources inside hidden containers.
+  // Destroy HLS instances and release video resources inside a container
+  // so hidden A/B variants don't hog MediaSource slots or bandwidth.
   function teardownPlayers(container) {
     if (!container) return;
     container.querySelectorAll('[data-bunny-player-init]').forEach(function (p) {
@@ -840,9 +890,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  function ensurePlayerReady(playerRoot) {
-    if (!playerRoot) return;
-    playerRoot.querySelectorAll('[data-bunny-player-init]').forEach(function (p) {
+  // Ensure the player inside a container is ready to play. If the initial
+  // HLS.js attachment failed (e.g. script wasn't loaded yet, or browser
+  // hit a MediaSource limit), this gives it a fresh start.
+  function ensurePlayerReady(container) {
+    if (!container) return;
+    container.querySelectorAll('[data-bunny-player-init]').forEach(function (p) {
       var v = p.querySelector('video');
       if (v && v.readyState === 0 && p._reinitMedia) {
         p._reinitMedia();
@@ -850,93 +903,91 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  function initHeroVideoB1() {
-    var b1 = document.getElementById('hero-video-b1');
-    var toHide = [
-      document.getElementById('hero-video-control'),
-      document.getElementById('hero-video-a2')
-    ];
+  function runHeroVideoTest() {
+    posthog.onFeatureFlags(function () {
+      const heroVideoVariant = posthog.getFeatureFlag('Hero-Video');
+      var refs = getHeroVideoContainers();
+      const controlVideo = refs.controlVideo;
+      const videoB1 = refs.videoB1;
+      const videoA2 = refs.videoA2;
 
-    if (!b1) {
-      console.warn('Hero video #hero-video-b1 not found');
+      if (!controlVideo || !videoB1 || !videoA2) {
+        console.warn('Hero video elements not found');
+        return;
+      }
+
+      var shownContainer = null;
+
+      // Show the correct variant
+      switch (heroVideoVariant) {
+        case 'control':
+          shownContainer = controlVideo;
+          console.log('Showing control variant');
+          break;
+        case 'video-b1':
+          shownContainer = videoB1;
+          console.log('Showing video-b1 variant');
+          break;
+        case 'video-a2':
+          shownContainer = videoA2;
+          console.log('Showing video-a2 variant');
+          break;
+        case false:
+        case undefined:
+        case null:
+          console.log('Feature flag not active, showing control');
+          shownContainer = controlVideo;
+          break;
+        default:
+          console.log('Unknown variant:', heroVideoVariant, '- showing control');
+          shownContainer = controlVideo;
+      }
+
+      showOnlyOneVariant(shownContainer);
+
+      console.log('Hero video variant loaded:', heroVideoVariant);
+    });
+  }
+
+  function waitForPostHog(callback) {
+    if (typeof window.posthog !== 'undefined' && window.posthog) {
+      console.log('PostHog found immediately');
+      callback();
       return;
     }
 
-    showContainer(b1);
-    ensurePlayerReady(b1);
+    console.log('Waiting for PostHog to load from GTM...');
 
-    toHide.forEach(function (container) {
-      hideContainer(container);
-      teardownPlayers(container);
-    });
-  }
+    let elapsed = 0;
+    const interval = setInterval(function () {
+      elapsed += CHECK_INTERVAL;
 
-  function installHeroVideoCssOverride() {
-    var styleId = 'hero-video-b1-only-override';
-    if (document.getElementById(styleId)) return;
-    var style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = [
-      '#hero-video-b1{display:block !important;visibility:visible !important;opacity:1 !important;pointer-events:auto !important;}',
-      '#hero-video-b1 [data-bunny-player-init],#hero-video-b1 video{display:block !important;visibility:visible !important;opacity:1 !important;}',
-      '#hero-video-control,#hero-video-a2{display:none !important;visibility:hidden !important;opacity:0 !important;pointer-events:none !important;}'
-    ].join('');
-    document.head.appendChild(style);
-  }
-
-  function installB1VisibilityGuard() {
-    var enforce = function () {
-      initHeroVideoB1();
-    };
-
-    var observer = new MutationObserver(function (mutations) {
-      var shouldEnforce = false;
-      for (var i = 0; i < mutations.length; i++) {
-        var m = mutations[i];
-        if (m.type === 'childList') {
-          shouldEnforce = true;
-          break;
-        }
-        if (m.type === 'attributes') {
-          shouldEnforce = true;
-          break;
-        }
+      if (typeof window.posthog !== 'undefined' && window.posthog) {
+        clearInterval(interval);
+        console.log('PostHog loaded after', elapsed, 'ms');
+        callback();
+        return;
       }
-      if (!shouldEnforce) return;
-      enforce();
-    });
-    observer.observe(document.documentElement, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ['style', 'class', 'hidden']
-    });
 
-    var ticks = 0;
-    var maxTicks = isMobile ? 120 : 30; // mobile: ~24s at 200ms
-    var interval = setInterval(function () {
-      enforce();
-      ticks++;
-      if (ticks >= maxTicks) clearInterval(interval);
-    }, 200);
+      if (elapsed >= MAX_WAIT_TIME) {
+        clearInterval(interval);
+        console.error('PostHog failed to load within', MAX_WAIT_TIME, 'ms');
+        var refs = getHeroVideoContainers();
+        if (refs.controlVideo) showOnlyOneVariant(refs.controlVideo);
+      }
+    }, CHECK_INTERVAL);
   }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
-      installHeroVideoCssOverride();
-      initHeroVideoB1();
-      installB1VisibilityGuard();
+      // Keep only one variant visible while PostHog is still loading.
+      var refs = getHeroVideoContainers();
+      if (refs.controlVideo) showOnlyOneVariant(refs.controlVideo);
+      waitForPostHog(runHeroVideoTest);
     });
   } else {
-    installHeroVideoCssOverride();
-    initHeroVideoB1();
-    installB1VisibilityGuard();
+    var refs = getHeroVideoContainers();
+    if (refs.controlVideo) showOnlyOneVariant(refs.controlVideo);
+    waitForPostHog(runHeroVideoTest);
   }
-
-  // Re-apply in case responsive scripts/styles toggle visibility after load.
-  window.addEventListener('load', initHeroVideoB1);
-  window.addEventListener('resize', initHeroVideoB1);
-  window.addEventListener('pageshow', initHeroVideoB1);
-  setTimeout(initHeroVideoB1, 100);
-  setTimeout(initHeroVideoB1, 500);
 })();
