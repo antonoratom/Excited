@@ -1,10 +1,7 @@
 // Initialize Mini Showreel Player
-if (window.gsap && window.Flip) {
-  gsap.registerPlugin(Flip);
-}
+gsap.registerPlugin(Flip);
 
 function initMiniShowreelPlayer() {
-  if (!window.gsap || !window.Flip) return;
   const openBtns = document.querySelectorAll("[data-mini-showreel-open]");
   if (!openBtns.length) return;
 
@@ -370,8 +367,9 @@ function initBunnyPlayer() {
       }
     }
 
-    // Allow re-initialization if initial HLS.js attachment was blocked
-    // by resource limits or script-load timing.
+    // Allow re-initialization (used by A/B test cleanup to refresh a
+    // player whose initial HLS.js attachment may have been blocked by
+    // resource limits or script-load timing).
     player._reinitMedia = function () {
       if (player._hls) { try { player._hls.destroy(); } catch (_) { } player._hls = null; }
       isAttached = false;
@@ -801,30 +799,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
 (function () {
   'use strict';
-  var isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-  function showContainer(container) {
-    if (!container) return;
-    container.style.setProperty('display', 'block', 'important');
-    container.style.setProperty('visibility', 'visible', 'important');
-    container.style.setProperty('opacity', '1', 'important');
-    container.style.setProperty('pointer-events', 'auto', 'important');
-    container.querySelectorAll('[data-bunny-player-init], video').forEach(function (el) {
-      el.style.setProperty('display', 'block', 'important');
-      el.style.setProperty('visibility', 'visible', 'important');
-      el.style.setProperty('opacity', '1', 'important');
+  function getHeroVideoContainers() {
+    return {
+      controlVideo: document.getElementById('hero-video-control'),
+      videoB1: document.getElementById('hero-video-b1'),
+      videoA2: document.getElementById('hero-video-a2')
+    };
+  }
+
+  function showOnlyOneVariant(shownContainer) {
+    var refs = getHeroVideoContainers();
+    var allContainers = [refs.controlVideo, refs.videoB1, refs.videoA2].filter(Boolean);
+    if (!allContainers.length || !shownContainer) return;
+
+    allContainers.forEach(function (c) {
+      c.style.display = (c === shownContainer) ? 'block' : 'none';
+      c.style.visibility = (c === shownContainer) ? 'visible' : 'hidden';
+      c.style.opacity = (c === shownContainer) ? '1' : '0';
     });
+
+    allContainers.forEach(function (c) {
+      if (c !== shownContainer) teardownPlayers(c);
+    });
+    ensurePlayerReady(shownContainer);
   }
 
-  function hideContainer(container) {
-    if (!container) return;
-    container.style.setProperty('display', 'none', 'important');
-    container.style.setProperty('visibility', 'hidden', 'important');
-    container.style.setProperty('opacity', '0', 'important');
-    container.style.setProperty('pointer-events', 'none', 'important');
-  }
-
-  // Destroy HLS instances and release video resources inside hidden containers.
+  // Destroy HLS instances and release video resources inside a container
+  // so hidden A/B variants don't hog MediaSource slots or bandwidth.
   function teardownPlayers(container) {
     if (!container) return;
     container.querySelectorAll('[data-bunny-player-init]').forEach(function (p) {
@@ -840,9 +842,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  function ensurePlayerReady(playerRoot) {
-    if (!playerRoot) return;
-    playerRoot.querySelectorAll('[data-bunny-player-init]').forEach(function (p) {
+  // Ensure the player inside a container is ready to play. If the initial
+  // HLS.js attachment failed (e.g. script wasn't loaded yet, or browser
+  // hit a MediaSource limit), this gives it a fresh start.
+  function ensurePlayerReady(container) {
+    if (!container) return;
+    container.querySelectorAll('[data-bunny-player-init]').forEach(function (p) {
       var v = p.querySelector('video');
       if (v && v.readyState === 0 && p._reinitMedia) {
         p._reinitMedia();
@@ -850,93 +855,19 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  function initHeroVideoB1() {
-    var b1 = document.getElementById('hero-video-b1');
-    var toHide = [
-      document.getElementById('hero-video-control'),
-      document.getElementById('hero-video-a2')
-    ];
-
-    if (!b1) {
+  function showHeroVideoB1Only() {
+    var refs = getHeroVideoContainers();
+    if (!refs.videoB1) {
       console.warn('Hero video #hero-video-b1 not found');
       return;
     }
-
-    showContainer(b1);
-    ensurePlayerReady(b1);
-
-    toHide.forEach(function (container) {
-      hideContainer(container);
-      teardownPlayers(container);
-    });
-  }
-
-  function installHeroVideoCssOverride() {
-    var styleId = 'hero-video-b1-only-override';
-    if (document.getElementById(styleId)) return;
-    var style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = [
-      '#hero-video-b1{display:block !important;visibility:visible !important;opacity:1 !important;pointer-events:auto !important;}',
-      '#hero-video-b1 [data-bunny-player-init],#hero-video-b1 video{display:block !important;visibility:visible !important;opacity:1 !important;}',
-      '#hero-video-control,#hero-video-a2{display:none !important;visibility:hidden !important;opacity:0 !important;pointer-events:none !important;}'
-    ].join('');
-    document.head.appendChild(style);
-  }
-
-  function installB1VisibilityGuard() {
-    var enforce = function () {
-      initHeroVideoB1();
-    };
-
-    var observer = new MutationObserver(function (mutations) {
-      var shouldEnforce = false;
-      for (var i = 0; i < mutations.length; i++) {
-        var m = mutations[i];
-        if (m.type === 'childList') {
-          shouldEnforce = true;
-          break;
-        }
-        if (m.type === 'attributes') {
-          shouldEnforce = true;
-          break;
-        }
-      }
-      if (!shouldEnforce) return;
-      enforce();
-    });
-    observer.observe(document.documentElement, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ['style', 'class', 'hidden']
-    });
-
-    var ticks = 0;
-    var maxTicks = isMobile ? 120 : 30; // mobile: ~24s at 200ms
-    var interval = setInterval(function () {
-      enforce();
-      ticks++;
-      if (ticks >= maxTicks) clearInterval(interval);
-    }, 200);
+    showOnlyOneVariant(refs.videoB1);
+    console.log('Showing only #hero-video-b1');
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      installHeroVideoCssOverride();
-      initHeroVideoB1();
-      installB1VisibilityGuard();
-    });
+    document.addEventListener('DOMContentLoaded', showHeroVideoB1Only);
   } else {
-    installHeroVideoCssOverride();
-    initHeroVideoB1();
-    installB1VisibilityGuard();
+    showHeroVideoB1Only();
   }
-
-  // Re-apply in case responsive scripts/styles toggle visibility after load.
-  window.addEventListener('load', initHeroVideoB1);
-  window.addEventListener('resize', initHeroVideoB1);
-  window.addEventListener('pageshow', initHeroVideoB1);
-  setTimeout(initHeroVideoB1, 100);
-  setTimeout(initHeroVideoB1, 500);
 })();
